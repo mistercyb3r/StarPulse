@@ -8,25 +8,33 @@ interface WeatherCardProps {
 
 export function WeatherCard({ weather }: WeatherCardProps) {
   if (weather === null) {
-    return <InfoCard title="🌤 Weather" rows={[]} unavailableMessage="Loading weather…" />;
+    return <InfoCard title="🌦 Weather" rows={[]} unavailableMessage="Loading weather…" />;
   }
 
   if (!weather.available) {
-    return <InfoCard title="🌤 Weather" rows={[]} unavailableMessage={weather.message ?? "Weather is unavailable"} />;
+    return <InfoCard title="🌦 Weather" rows={[]} unavailableMessage={weather.message ?? "Weather is unavailable"} />;
   }
 
-  const locationLabel = weather.location_source === "dish_gps" ? "Dish GPS location" : "Configured location";
+  const locationLabel =
+    weather.location_source === "dish_gps"
+      ? "Dish GPS location"
+      : weather.location_source === "stored"
+        ? "Last known location"
+        : "Configured location";
 
   return (
     <InfoCard
-      title="🌤 Weather"
-      subtitle={locationLabel}
+      title="🌦 Weather"
+      subtitle={weather.conditions ? `${weather.conditions} · ${locationLabel}` : locationLabel}
       rows={[
         { label: "Temperature", value: formatTemperature(weather.temperature_c) },
+        { label: "Wind", value: formatWindSpeed(weather.wind_speed_kph) },
+        {
+          label: "Rain",
+          value: formatPercent(weather.precipitation_probability, 0),
+        },
         { label: "Feels Like", value: formatTemperature(weather.feels_like_c) },
         { label: "Humidity", value: formatPercent(weather.humidity_percent, 0) },
-        { label: "Wind Speed", value: formatWindSpeed(weather.wind_speed_kph) },
-        { label: "Conditions", value: weather.conditions ?? "—" },
       ]}
       footer={<span className="info-card__timestamp">Updated {formatRelativeTime(weather.fetched_at)}</span>}
     />

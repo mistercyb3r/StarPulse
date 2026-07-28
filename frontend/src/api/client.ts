@@ -10,6 +10,9 @@ import type {
   StarlinkSummaryResponse,
   SummaryPeriod,
   TelemetrySample,
+  WeatherHistoryPeriod,
+  WeatherHistoryResponse,
+  WeatherImpactResponse,
   WeatherResponse,
 } from "./types";
 
@@ -161,4 +164,12 @@ export function getOutages(): Promise<OutageSummaryResponse> {
 
 export function getWeather(): Promise<WeatherResponse> {
   return getJson<WeatherResponse>("/api/weather");
+}
+
+export function getWeatherImpact(): Promise<WeatherImpactResponse> {
+  return getJson<WeatherImpactResponse>("/api/weather/impact");
+}
+
+export function getWeatherHistory(period: WeatherHistoryPeriod = "24h"): Promise<WeatherHistoryResponse> {
+  return getJson<WeatherHistoryResponse>("/api/weather/history", { period });
 }

@@ -12,7 +12,7 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Callable, Protocol
+from typing import Any, Callable, Protocol
 
 import httpx
 
@@ -76,6 +76,8 @@ class WeatherSnapshot:
     humidity_percent: float | None
     wind_speed_kph: float | None
     conditions: str
+    precipitation_mm: float | None
+    precipitation_probability: float | None
     latitude: float
     longitude: float
     fetched_at: datetime
@@ -87,6 +89,33 @@ class WeatherClient(Protocol):
     def fetch(self, latitude: float, longitude: float) -> WeatherSnapshot: ...
 
 
+def _nearest_hourly_precipitation_probability(data: dict[str, Any], now: datetime) -> float | None:
+    """Pick the precip probability from the hourly series closest to ``now``."""
+    hourly = data.get("hourly") or {}
+    times = hourly.get("time") or []
+    probs = hourly.get("precipitation_probability") or []
+    if not times or not probs or len(times) != len(probs):
+        return None
+
+    best_idx = 0
+    best_delta = None
+    for idx, raw in enumerate(times):
+        try:
+            # Open-Meteo returns local ISO timestamps without Z when timezone=auto.
+            ts = datetime.fromisoformat(raw)
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=now.tzinfo or timezone.utc)
+            delta = abs((ts - now).total_seconds())
+        except ValueError:
+            continue
+        if best_delta is None or delta < best_delta:
+            best_delta = delta
+            best_idx = idx
+
+    value = probs[best_idx]
+    return float(value) if value is not None else None
+
+
 class OpenMeteoWeatherClient:
     """Real ``WeatherClient`` backed by the free Open-Meteo forecast API."""
 
@@ -94,7 +123,12 @@ class OpenMeteoWeatherClient:
         params = {
             "latitude": latitude,
             "longitude": longitude,
-            "current": "temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,weather_code",
+            "current": (
+                "temperature_2m,relative_humidity_2m,apparent_temperature,"
+                "wind_speed_10m,weather_code,precipitation"
+            ),
+            "hourly": "precipitation_probability",
+            "forecast_days": 1,
             "timezone": "auto",
         }
         try:
@@ -104,6 +138,7 @@ class OpenMeteoWeatherClient:
         except (httpx.HTTPError, ValueError) as exc:
             raise WeatherUnavailableError(f"Open-Meteo request failed: {exc}") from exc
 
+        now = datetime.now(timezone.utc)
         current = data.get("current") or {}
         return WeatherSnapshot(
             temperature_c=current.get("temperature_2m"),
@@ -111,9 +146,11 @@ class OpenMeteoWeatherClient:
             humidity_percent=current.get("relative_humidity_2m"),
             wind_speed_kph=current.get("wind_speed_10m"),
             conditions=describe_weather_code(current.get("weather_code")),
+            precipitation_mm=current.get("precipitation"),
+            precipitation_probability=_nearest_hourly_precipitation_probability(data, now),
             latitude=latitude,
             longitude=longitude,
-            fetched_at=datetime.now(timezone.utc),
+            fetched_at=now,
         )
 
 
@@ -140,6 +177,10 @@ class CachedWeatherProvider:
         self._clock = clock
         self._lock = threading.Lock()
         self._cache: dict[tuple[float, float], WeatherSnapshot] = {}
+
+    @property
+    def cache_seconds(self) -> float:
+        return self._cache_seconds
 
     def get_weather(self, latitude: float, longitude: float) -> WeatherSnapshot:
         key = (round(latitude, 2), round(longitude, 2))

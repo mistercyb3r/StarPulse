@@ -36,6 +36,8 @@ def _snapshot(**overrides) -> WeatherSnapshot:
         humidity_percent=65.0,
         wind_speed_kph=10.0,
         conditions="Partly cloudy",
+        precipitation_mm=0.0,
+        precipitation_probability=10.0,
         latitude=51.5,
         longitude=-0.1,
         fetched_at=datetime.now(timezone.utc),
@@ -45,7 +47,7 @@ def _snapshot(**overrides) -> WeatherSnapshot:
 
 def _make_app(tmp_path: Path, weather_client, env: dict[str, str] | None = None) -> FastAPI:
     settings = load_settings(data_dir=tmp_path / "data", env=env or {})
-    return create_app(settings, start_collector=False, weather_client=weather_client)
+    return create_app(settings, start_collector=False, start_weather_sampler=False, weather_client=weather_client)
 
 
 def test_weather_unavailable_when_no_location(tmp_path: Path) -> None:
@@ -169,3 +171,91 @@ def test_weather_returns_unavailable_when_upstream_fails(tmp_path: Path) -> None
     body = response.json()
     assert body["available"] is False
     assert "unreachable" in body["message"].lower()
+
+
+def test_weather_includes_precipitation_fields(tmp_path: Path) -> None:
+    app = _make_app(
+        tmp_path,
+        FakeWeatherClient(_snapshot(precipitation_mm=1.5, precipitation_probability=65.0)),
+        env={"STARPULSE_WEATHER_LATITUDE": "51.5", "STARPULSE_WEATHER_LONGITUDE": "-0.1"},
+    )
+    with TestClient(app) as client:
+        response = client.get("/api/weather")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["precipitation_mm"] == pytest.approx(1.5)
+    assert body["precipitation_probability"] == pytest.approx(65.0)
+
+
+def test_weather_impact_reports_low_for_clear_conditions(tmp_path: Path) -> None:
+    app = _make_app(
+        tmp_path,
+        FakeWeatherClient(_snapshot(conditions="Clear sky", wind_speed_kph=8.0, precipitation_probability=5.0)),
+        env={"STARPULSE_WEATHER_LATITUDE": "51.5", "STARPULSE_WEATHER_LONGITUDE": "-0.1"},
+    )
+    with TestClient(app) as client:
+        response = client.get("/api/weather/impact")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is True
+    assert body["severity"] == "Low"
+    assert any("Clear" in reason or "Low wind" in reason or "No rain" in reason for reason in body["reasons"])
+
+
+def test_weather_impact_reports_high_for_heavy_rain(tmp_path: Path) -> None:
+    app = _make_app(
+        tmp_path,
+        FakeWeatherClient(
+            _snapshot(conditions="Heavy rain", wind_speed_kph=20.0, precipitation_mm=3.0, precipitation_probability=90.0)
+        ),
+        env={"STARPULSE_WEATHER_LATITUDE": "51.5", "STARPULSE_WEATHER_LONGITUDE": "-0.1"},
+    )
+    with TestClient(app) as client:
+        response = client.get("/api/weather/impact")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["severity"] == "High"
+
+
+def test_weather_history_returns_period_payload(tmp_path: Path) -> None:
+    app = _make_app(
+        tmp_path,
+        FakeWeatherClient(_snapshot()),
+        env={"STARPULSE_WEATHER_LATITUDE": "51.5", "STARPULSE_WEATHER_LONGITUDE": "-0.1"},
+    )
+    with TestClient(app) as client:
+        response = client.get("/api/weather/history?period=24h")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["period"] == "24h"
+    assert "weather" in body
+    assert "performance" in body
+    assert "outages" in body
+
+
+def test_weather_falls_back_to_app_meta_stored_location(tmp_path: Path) -> None:
+    from starpulse.db.models import AppMeta
+    from starpulse.services.location import RESOLVED_LAT_KEY, RESOLVED_LON_KEY
+
+    weather = FakeWeatherClient(_snapshot(latitude=48.0, longitude=2.0))
+    app = _make_app(tmp_path, weather)
+    session = next(app.state.db.get_session())
+    try:
+        session.add(AppMeta(key=RESOLVED_LAT_KEY, value="48.0"))
+        session.add(AppMeta(key=RESOLVED_LON_KEY, value="2.0"))
+        session.commit()
+    finally:
+        session.close()
+
+    with TestClient(app) as client:
+        response = client.get("/api/weather")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is True
+    assert body["location_source"] == "stored"
+    assert weather.last_coords == (48.0, 2.0)

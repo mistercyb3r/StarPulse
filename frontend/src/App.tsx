@@ -3,8 +3,9 @@ import { getSetupStatus } from "./api/client";
 import { Dashboard } from "./components/Dashboard";
 import { LoadingScreen } from "./components/LoadingScreen";
 import { SetupWizard } from "./components/SetupWizard";
+import { WeatherImpactPage } from "./components/WeatherImpactPage";
 
-type View = "checking" | "setup" | "dashboard";
+type View = "checking" | "setup" | "dashboard" | "weather-impact";
 
 export function App() {
   const [view, setView] = useState<View>("checking");
@@ -35,5 +36,9 @@ export function App() {
     return <SetupWizard onComplete={() => setView("dashboard")} />;
   }
 
-  return <Dashboard />;
+  if (view === "weather-impact") {
+    return <WeatherImpactPage onBack={() => setView("dashboard")} />;
+  }
+
+  return <Dashboard onOpenWeatherImpact={() => setView("weather-impact")} />;
 }

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from starpulse.app import create_app
@@ -89,3 +90,49 @@ def test_setup_rejects_invalid_payload(tmp_path: Path) -> None:
         )
 
     assert response.status_code == 422
+
+
+def test_setup_optional_weather_coords_write_config(tmp_path: Path) -> None:
+    with _make_client(tmp_path) as client:
+        response = client.post(
+            "/api/setup",
+            json={
+                "dish_host": "192.168.100.1",
+                "poll_interval_seconds": 5.0,
+                "port": 8000,
+                "weather_latitude": 54.6872,
+                "weather_longitude": 25.2797,
+            },
+        )
+        assert response.status_code == 200
+
+        status = client.get("/api/setup/status").json()
+        assert status["weather_latitude"] == pytest.approx(54.6872)
+        assert status["weather_longitude"] == pytest.approx(25.2797)
+
+    reloaded = load_settings(data_dir=tmp_path, env={})
+    assert reloaded.weather.latitude == pytest.approx(54.6872)
+    assert reloaded.weather.longitude == pytest.approx(25.2797)
+
+
+def test_setup_omitting_weather_coords_leaves_existing_config(tmp_path: Path) -> None:
+    with _make_client(tmp_path) as client:
+        client.post(
+            "/api/setup",
+            json={
+                "dish_host": "192.168.100.1",
+                "poll_interval_seconds": 5.0,
+                "port": 8000,
+                "weather_latitude": 51.5,
+                "weather_longitude": -0.1,
+            },
+        )
+        client.post(
+            "/api/setup",
+            json={"dish_host": "10.0.0.5", "poll_interval_seconds": 8.0, "port": 8000},
+        )
+
+        status = client.get("/api/setup/status").json()
+        assert status["dish_host"] == "10.0.0.5"
+        assert status["weather_latitude"] == pytest.approx(51.5)
+        assert status["weather_longitude"] == pytest.approx(-0.1)

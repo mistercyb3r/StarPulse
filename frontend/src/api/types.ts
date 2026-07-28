@@ -97,7 +97,7 @@ export interface OutageSummaryResponse {
   events: ConnectionEventResponse[];
 }
 
-export type WeatherLocationSource = "dish_gps" | "configured" | null;
+export type WeatherLocationSource = "dish_gps" | "configured" | "stored" | null;
 
 export interface WeatherResponse {
   available: boolean;
@@ -106,11 +106,62 @@ export interface WeatherResponse {
   humidity_percent: number | null;
   wind_speed_kph: number | null;
   conditions: string | null;
+  precipitation_mm: number | null;
+  precipitation_probability: number | null;
   latitude: number | null;
   longitude: number | null;
   location_source: WeatherLocationSource;
   fetched_at: string | null;
   message: string | null;
+}
+
+export type WeatherImpactSeverity = "Low" | "Moderate" | "High" | "Unknown" | string;
+
+export interface WeatherImpactResponse {
+  available: boolean;
+  severity: WeatherImpactSeverity;
+  reasons: string[];
+  conditions: string | null;
+  temperature_c: number | null;
+  wind_speed_kph: number | null;
+  precipitation_probability: number | null;
+  precipitation_mm: number | null;
+  latency_ms: number | null;
+  download_bps: number | null;
+  upload_bps: number | null;
+  latency_delta_percent: number | null;
+  download_delta_percent: number | null;
+  active_outage: boolean;
+  sample_count: number;
+  message: string | null;
+}
+
+export type WeatherHistoryPeriod = "24h" | "7d" | "30d";
+
+export interface WeatherHistoryPoint {
+  timestamp: string;
+  temperature_c: number | null;
+  wind_speed_kph: number | null;
+  precipitation_mm: number | null;
+  precipitation_probability: number | null;
+  conditions: string | null;
+}
+
+export interface PerformanceBucket {
+  timestamp: string;
+  average_download_bps: number | null;
+  average_upload_bps: number | null;
+  average_latency_ms: number | null;
+  sample_count: number;
+}
+
+export interface WeatherHistoryResponse {
+  period: WeatherHistoryPeriod;
+  range_start: string;
+  range_end: string;
+  weather: WeatherHistoryPoint[];
+  performance: PerformanceBucket[];
+  outages: ConnectionEventResponse[];
 }
 
 export interface HealthResponse {
@@ -128,12 +179,16 @@ export interface SetupStatusResponse {
   dish_port: number;
   poll_interval_seconds: number;
   port: number;
+  weather_latitude: number | null;
+  weather_longitude: number | null;
 }
 
 export interface SetupRequest {
   dish_host: string;
   poll_interval_seconds: number;
   port: number;
+  weather_latitude?: number | null;
+  weather_longitude?: number | null;
 }
 
 export interface SetupResponse {

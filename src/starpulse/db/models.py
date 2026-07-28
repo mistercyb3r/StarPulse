@@ -108,3 +108,29 @@ class ConnectionEvent(Base):
 
     # One of: "disconnected", "high_packet_loss", "dish_unavailable".
     reason: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class WeatherSample(Base):
+    """One persisted weather reading, sampled on the weather cache interval.
+
+    Used for Weather Impact Analysis and the Weather vs Performance history
+    chart — never written from API request handlers directly.
+    """
+
+    __tablename__ = "weather_samples"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True, default=_utcnow)
+
+    temperature_c: Mapped[float | None] = mapped_column(Float, nullable=True)
+    feels_like_c: Mapped[float | None] = mapped_column(Float, nullable=True)
+    humidity_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
+    wind_speed_kph: Mapped[float | None] = mapped_column(Float, nullable=True)
+    precipitation_mm: Mapped[float | None] = mapped_column(Float, nullable=True)
+    precipitation_probability: Mapped[float | None] = mapped_column(Float, nullable=True)
+    conditions: Mapped[str] = mapped_column(String(64), nullable=False)
+
+    latitude: Mapped[float] = mapped_column(Float, nullable=False)
+    longitude: Mapped[float] = mapped_column(Float, nullable=False)
+    # One of: "configured", "dish_gps", "stored".
+    location_source: Mapped[str] = mapped_column(String(32), nullable=False)

@@ -18,6 +18,7 @@ from starpulse.core.paths import resolve_db_path
 from starpulse.db.session import Database
 from starpulse.logging_config import configure_logging, get_logger
 from starpulse.services.weather import CachedWeatherProvider, OpenMeteoWeatherClient, WeatherClient
+from starpulse.services.weather_sampler import WeatherSampler
 
 StarlinkClientFactory = Callable[[str, int], StarlinkClient]
 
@@ -29,6 +30,7 @@ def create_app(
     *,
     starlink_client: StarlinkClient | None = None,
     start_collector: bool = True,
+    start_weather_sampler: bool | None = None,
     weather_client: WeatherClient | None = None,
 ) -> FastAPI:
     """Build and return a configured FastAPI application.
@@ -40,12 +42,16 @@ def create_app(
     starting the background poller entirely, e.g. for tests that only
     care about the HTTP API. ``weather_client`` similarly lets tests
     inject a fake instead of making real requests to Open-Meteo.
+    ``start_weather_sampler`` defaults to matching ``start_collector``.
     """
     settings = settings or load_settings()
     configure_logging(level=settings.logging.level, log_file=settings.logging.file or None)
 
     logger.info("Starting StarPulse v%s", __version__)
     logger.debug("Using data directory: %s", settings.data_dir)
+
+    if start_weather_sampler is None:
+        start_weather_sampler = start_collector
 
     db_path = resolve_db_path(settings.data_dir, settings.database.path)
     database = Database(db_path)
@@ -65,14 +71,23 @@ def create_app(
         settings.starlink.poll_interval_seconds,
         outage_tracker=outage_tracker,
     )
+    weather_provider = CachedWeatherProvider(
+        weather_client or OpenMeteoWeatherClient(),
+        cache_seconds=settings.weather.cache_seconds,
+    )
+    weather_sampler = WeatherSampler(database, settings, collector, weather_provider)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         if start_collector:
             collector.start()
+        if start_weather_sampler:
+            weather_sampler.start()
         try:
             yield
         finally:
+            if start_weather_sampler:
+                weather_sampler.stop()
             if start_collector:
                 collector.stop()
             logger.info("Shutting down StarPulse")
@@ -88,10 +103,8 @@ def create_app(
     app.state.db = database
     app.state.collector = collector
     app.state.starlink_client_factory = client_factory
-    app.state.weather_provider = CachedWeatherProvider(
-        weather_client or OpenMeteoWeatherClient(),
-        cache_seconds=settings.weather.cache_seconds,
-    )
+    app.state.weather_provider = weather_provider
+    app.state.weather_sampler = weather_sampler
     # The port actually bound by the running server process, captured
     # before any setup-wizard update mutates settings.server.port — used
     # to tell the caller whether a restart is needed for a port change.
@@ -104,7 +117,7 @@ def create_app(
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
-        allow_methods=["GET"],
+        allow_methods=["GET", "POST"],
         allow_headers=["*"],
     )
 

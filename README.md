@@ -71,7 +71,11 @@ StarPulse/
 │   │   ├── outages.py          # Degraded-connection classification (disconnected/high loss/dish down)
 │   │   └── poller.py           # Background thread that polls on an interval
 │   ├── services/
-│   │   └── weather.py          # Open-Meteo client + TTL cache (independent of the collector)
+│   │   ├── weather.py          # Open-Meteo client + TTL cache
+│   │   ├── weather_repository.py # Persist/query weather_samples
+│   │   ├── weather_sampler.py  # Background weather history sampler
+│   │   ├── weather_impact.py   # Weather Impact severity + reasons
+│   │   └── location.py         # Weather location priority resolver
 │   └── api/
 │       ├── router.py          # Aggregates feature routers under /api
 │       ├── deps.py            # Shared FastAPI dependencies
@@ -80,10 +84,10 @@ StarPulse/
 │           ├── health.py      # GET /api/health
 │           ├── setup.py       # GET/POST /api/setup (first-run wizard)
 │           ├── starlink.py    # GET /api/starlink/{status,history,summary,health,dish-info,outages}
-│           └── weather.py     # GET /api/weather
+│           └── weather.py     # GET /api/weather, /impact, /history
 ├── tests/                     # pytest suite mirroring the package layout
 │   ├── collector/              # Collector tests, using mocked dish responses
-│   └── services/                # Weather client/cache tests
+│   └── services/                # Weather client/cache + impact tests
 ├── frontend/                  # React + TypeScript dashboard (separate app, see below)
 │   ├── public/
 │   │   ├── icons/               # PWA app icons (192/512/maskable)
@@ -91,7 +95,7 @@ StarPulse/
 │   ├── src/
 │   │   ├── api/                # Fetch client, types mirroring the Pydantic schemas, mock data
 │   │   ├── hooks/               # useStarlinkTelemetry (polling + mock fallback), usePwaInstallPrompt
-│   │   ├── components/          # Dashboard, SetupWizard, MetricCard, InfoCard, charts/
+│   │   ├── components/          # Dashboard, WeatherImpactPage, SetupWizard, cards/charts
 │   │   └── utils/format.ts     # Number/duration/time formatting helpers
 │   ├── vite.config.ts          # Dev server + /api proxy + vite-plugin-pwa (manifest/service worker)
 │   ├── Dockerfile              # Multi-stage build -> nginx (serves the SPA, proxies /api)
@@ -183,6 +187,9 @@ asking for:
   almost all installations)
 - **Polling interval**, in seconds
 - **Application port** StarPulse's backend should listen on
+- **Optional weather latitude / longitude** — leave blank to use dish
+  GPS when available; if both are provided they are written to
+  `[weather]` in `config.toml`
 
 Submitting the form:
 
@@ -343,6 +350,89 @@ over every matching sample) plus an optional `period` shorthand
 `CONNECTED`. All averages/peaks are `null` when there are no samples in
 range.
 
+## Weather and Weather Impact
+
+StarPulse optionally fetches local weather from the free **Open-Meteo**
+API (no API key, no account). Weather readings and impact analysis stay
+in your local SQLite database — nothing is uploaded to a StarPulse cloud
+service. Open-Meteo is the only external network call for this feature.
+
+### What is collected
+
+Current weather fields (also stored historically in `weather_samples`):
+
+| Field | Meaning |
+| --- | --- |
+| Temperature / feels-like | °C from Open-Meteo current conditions |
+| Humidity | Relative humidity % |
+| Wind | Wind speed in km/h |
+| Precipitation | Current precipitation in mm |
+| Rain probability | Nearest-hour `precipitation_probability` (0–100) |
+| Conditions | Human-readable WMO weather code label |
+| Lat / lon + source | Where the sample was resolved from |
+
+A background **`WeatherSampler`** (same style as the Starlink poller)
+runs on the weather cache interval (default **600 seconds** /
+`[weather] cache_seconds`). It reuses the in-memory
+`CachedWeatherProvider` TTL cache and only inserts a SQLite row when
+there is no recent sample within that interval — so history accumulates
+without bypassing the cache or hammering Open-Meteo.
+
+### Location priority
+
+Weather lookups resolve coordinates in this order (first match wins):
+
+1. User-configured `[weather] latitude` / `longitude` (config, env, or
+   setup wizard)
+2. Starlink dish GPS (live poller cache, then latest telemetry sample)
+3. Last successfully resolved coordinates stored in `app_meta`
+   (`weather_resolved_*`) for continuity after restart
+4. Otherwise the API reports `location unavailable`
+
+### Weather Impact severity
+
+`GET /api/weather/impact` scores current conditions as **Low**,
+**Moderate**, or **High**, with short human-readable reasons:
+
+1. **Weather heuristics first** — severe WMO labels (thunder / heavy
+   rain / snow / hail), wind ≥ 40 / 60 km/h, rain probability ≥ 40 /
+   70%, precipitation mm thresholds.
+2. **Performance vs good-weather baseline** — recent (~1h) telemetry
+   compared with averages overlapping clear/low-rain samples from the
+   last 7 days. Latency ↑ ≥ 25%/50%, download ↓ ≥ 25%/40%, elevated
+   packet loss, or an active outage bump severity and append reasons
+   (e.g. `Latency increased by 35%`).
+3. If weather is benign and deltas are small → **Low**, with reasons
+   like `Clear sky`, `Low wind`, `No rain`.
+
+### Weather API endpoints
+
+**`GET /api/weather`** — current snapshot (includes precip fields). Soft
+failure: returns `available: false` with a message rather than HTTP 5xx
+when location or upstream weather is unavailable.
+
+**`GET /api/weather/impact`** — severity, reasons, and a compact signal
+snapshot for dashboard cards.
+
+**`GET /api/weather/history?period=24h|7d|30d`** — time series of weather
+points, bucketed average download/upload/latency, and outage intervals
+overlapping the window (powers the Weather vs Performance view).
+
+```bash
+curl http://localhost:8000/api/weather
+curl http://localhost:8000/api/weather/impact
+curl "http://localhost:8000/api/weather/history?period=7d"
+```
+
+Optional weather settings:
+
+| Setting | config.toml | Environment variable | Default |
+| --- | --- | --- | --- |
+| Enabled | `[weather] enabled` | `STARPULSE_WEATHER_ENABLED` | `true` |
+| Latitude | `[weather] latitude` | `STARPULSE_WEATHER_LATITUDE` | *(unset → dish GPS / stored)* |
+| Longitude | `[weather] longitude` | `STARPULSE_WEATHER_LONGITUDE` | *(unset → dish GPS / stored)* |
+| Cache TTL (seconds) | `[weather] cache_seconds` | — | `600` |
+
 **`GET /api/starlink/health`** — a single 0-100 connection health score,
 derived from recent uptime, latency, and obstruction. Powers the
 dashboard's "Starlink Health" card.
@@ -436,15 +526,24 @@ What it shows:
 - **Dish Information** — model, software version, dish uptime, GPS
   status, satellite count, and pointing (azimuth/elevation), from
   `/api/starlink/dish-info`.
+- **Weather card** — temperature, wind, rain %, conditions from
+  `/api/weather`.
+- **Signal Conditions card** — Weather Impact severity (Low / Moderate /
+  High), current latency and download speed, plus short reason lines
+  from `/api/weather/impact`.
+- **Weather vs Performance** view (nav from the dashboard) — 24h / 7d /
+  30d charts correlating rain/precip probability with speed and latency,
+  plus outage bands from `/api/weather/history`.
 
 It polls `/api/health`, `/api/starlink/status`, `/api/starlink/history`,
-`/api/starlink/health`, `/api/starlink/dish-info`, and
+`/api/starlink/health`, `/api/starlink/dish-info`,
 `/api/starlink/summary` (re-fetched whenever the performance period
-changes) every 5 seconds. If any of those requests fail — the backend
-isn't running, or it's a fresh install with no telemetry collected yet —
-the dashboard falls back to generated mock data (all endpoints together,
-so the numbers stay consistent) and shows a banner saying so, rather
-than an error page or blank screen.
+changes), `/api/weather`, and `/api/weather/impact` every 5 seconds. If
+any of those requests fail — the backend isn't running, or it's a fresh
+install with no telemetry collected yet — the dashboard falls back to
+generated mock data (all endpoints together, so the numbers stay
+consistent) and shows a banner saying so, rather than an error page or
+blank screen.
 
 In development, `vite.config.ts` proxies `/api/*` to
 `http://localhost:8000`, so the browser never makes a cross-origin
@@ -520,6 +619,10 @@ Settings are resolved in this order (highest priority first):
 | Dish host              | `[starlink] dish_host`  | `STARPULSE_DISH_HOST`   | `192.168.100.1` |
 | Dish port              | `[starlink] dish_port`  | `STARPULSE_DISH_PORT`   | `9200`         |
 | Poll interval (seconds) | `[starlink] poll_interval_seconds` | `STARPULSE_POLL_INTERVAL_SECONDS` | `5.0` |
+| Weather enabled | `[weather] enabled` | `STARPULSE_WEATHER_ENABLED` | `true` |
+| Weather latitude | `[weather] latitude` | `STARPULSE_WEATHER_LATITUDE` | *(unset)* |
+| Weather longitude | `[weather] longitude` | `STARPULSE_WEATHER_LONGITUDE` | *(unset)* |
+| Weather cache TTL (seconds) | `[weather] cache_seconds` | — | `600` |
 
 Environment variables always win, even over values saved by the setup
 wizard — if a value doesn't seem to change after using the wizard,

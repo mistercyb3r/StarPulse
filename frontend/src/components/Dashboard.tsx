@@ -15,6 +15,7 @@ import { MockDataBanner } from "./MockDataBanner";
 import { OutageHistoryCard } from "./OutageHistoryCard";
 import { PerformanceStats, PERIOD_LABELS } from "./PerformanceStats";
 import { PowerCard } from "./PowerCard";
+import { SignalConditionsCard } from "./SignalConditionsCard";
 import { StarlinkHealthCard } from "./StarlinkHealthCard";
 import { StatusBadge } from "./StatusBadge";
 import { WeatherCard } from "./WeatherCard";
@@ -26,7 +27,11 @@ function toneForThreshold(value: number | null | undefined, warnAt: number, badA
   return "good";
 }
 
-export function Dashboard() {
+interface DashboardProps {
+  onOpenWeatherImpact?: () => void;
+}
+
+export function Dashboard({ onOpenWeatherImpact }: DashboardProps) {
   const {
     status,
     history,
@@ -37,6 +42,7 @@ export function Dashboard() {
     performancePeriod,
     setPerformancePeriod,
     weather,
+    weatherImpact,
     outages,
     isLoading,
     isUsingMockData,
@@ -61,6 +67,11 @@ export function Dashboard() {
           {status && <StatusBadge state={status.connection_state} />}
           {health?.starlink_connected === false && <ConnectionIndicator label="Dish Unreachable" tone="bad" />}
           <span className="dashboard__updated">Updated {formatRelativeTime(lastUpdated?.toISOString() ?? null)}</span>
+          {onOpenWeatherImpact && (
+            <button type="button" className="dashboard__nav-link" onClick={onOpenWeatherImpact}>
+              Weather Impact
+            </button>
+          )}
           <InstallPwaButton />
         </div>
       </header>
@@ -89,9 +100,10 @@ export function Dashboard() {
       <PerformanceStats performance={performance} period={performancePeriod} onPeriodChange={setPerformancePeriod} />
 
       <section className="dashboard__info-grid">
+        <WeatherCard weather={weather} />
+        <SignalConditionsCard impact={weatherImpact} />
         <PowerCard current={status} stats={performance} periodLabel={periodLabel} />
         <LatencyStatsCard current={status} stats={performance} periodLabel={periodLabel} />
-        <WeatherCard weather={weather} />
         <OutageHistoryCard outages={outages} />
       </section>
 

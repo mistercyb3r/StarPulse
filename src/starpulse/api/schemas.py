@@ -150,12 +150,61 @@ class WeatherResponse(BaseModel):
     humidity_percent: float | None = None
     wind_speed_kph: float | None = None
     conditions: str | None = None
+    precipitation_mm: float | None = None
+    precipitation_probability: float | None = None
     latitude: float | None = None
     longitude: float | None = None
-    # One of: "dish_gps", "configured", or None when unavailable.
+    # One of: "dish_gps", "configured", "stored", or None when unavailable.
     location_source: str | None = None
     fetched_at: datetime | None = None
     message: str | None = None
+
+
+class WeatherImpactResponse(BaseModel):
+    """Weather Impact score correlated with recent Starlink performance."""
+
+    available: bool
+    severity: str
+    reasons: list[str] = Field(default_factory=list)
+    conditions: str | None = None
+    temperature_c: float | None = None
+    wind_speed_kph: float | None = None
+    precipitation_probability: float | None = None
+    precipitation_mm: float | None = None
+    latency_ms: float | None = None
+    download_bps: float | None = None
+    upload_bps: float | None = None
+    latency_delta_percent: float | None = None
+    download_delta_percent: float | None = None
+    active_outage: bool = False
+    sample_count: int = 0
+    message: str | None = None
+
+
+class WeatherHistoryPoint(BaseModel):
+    timestamp: datetime
+    temperature_c: float | None = None
+    wind_speed_kph: float | None = None
+    precipitation_mm: float | None = None
+    precipitation_probability: float | None = None
+    conditions: str | None = None
+
+
+class PerformanceBucket(BaseModel):
+    timestamp: datetime
+    average_download_bps: float | None = None
+    average_upload_bps: float | None = None
+    average_latency_ms: float | None = None
+    sample_count: int = 0
+
+
+class WeatherHistoryResponse(BaseModel):
+    period: str
+    range_start: datetime
+    range_end: datetime
+    weather: list[WeatherHistoryPoint]
+    performance: list[PerformanceBucket]
+    outages: list[ConnectionEventResponse]
 
 
 class SetupStatusResponse(BaseModel):
@@ -171,6 +220,8 @@ class SetupStatusResponse(BaseModel):
     dish_port: int
     poll_interval_seconds: float
     port: int
+    weather_latitude: float | None = None
+    weather_longitude: float | None = None
 
 
 class SetupRequest(BaseModel):
@@ -179,6 +230,9 @@ class SetupRequest(BaseModel):
     dish_host: str = Field(min_length=1, max_length=255)
     poll_interval_seconds: float = Field(gt=0, le=3600)
     port: int = Field(ge=1, le=65535)
+    # Optional fixed weather location. Blank/None leaves dish GPS as the source.
+    weather_latitude: float | None = Field(default=None, ge=-90, le=90)
+    weather_longitude: float | None = Field(default=None, ge=-180, le=180)
 
 
 class SetupResponse(BaseModel):

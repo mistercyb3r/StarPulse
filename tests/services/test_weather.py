@@ -44,6 +44,8 @@ class FakeWeatherClient:
             humidity_percent=55.0,
             wind_speed_kph=12.0,
             conditions="Clear sky",
+            precipitation_mm=0.0,
+            precipitation_probability=5.0,
             latitude=latitude,
             longitude=longitude,
             fetched_at=self._clock() if self._clock is not None else datetime.now(timezone.utc),
@@ -129,6 +131,17 @@ def test_get_weather_caches_separately_per_rounded_coordinate() -> None:
 
 
 def test_open_meteo_client_parses_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    fixed_now = datetime(2026, 7, 28, 12, 5, tzinfo=timezone.utc)
+
+    class FakeDateTime:
+        @classmethod
+        def now(cls, tz=None):
+            return fixed_now
+
+        @classmethod
+        def fromisoformat(cls, value: str) -> datetime:
+            return datetime.fromisoformat(value)
+
     def fake_get(url, params=None, timeout=None):
         return httpx.Response(
             200,
@@ -139,11 +152,18 @@ def test_open_meteo_client_parses_response(monkeypatch: pytest.MonkeyPatch) -> N
                     "relative_humidity_2m": 60,
                     "wind_speed_10m": 14.2,
                     "weather_code": 3,
-                }
+                    "precipitation": 0.4,
+                    "time": "2026-07-28T12:00",
+                },
+                "hourly": {
+                    "time": ["2026-07-28T11:00", "2026-07-28T12:00", "2026-07-28T13:00"],
+                    "precipitation_probability": [10, 35, 20],
+                },
             },
             request=httpx.Request("GET", url),
         )
 
+    monkeypatch.setattr(weather_module, "datetime", FakeDateTime)
     monkeypatch.setattr(weather_module.httpx, "get", fake_get)
 
     client = OpenMeteoWeatherClient()
@@ -154,6 +174,8 @@ def test_open_meteo_client_parses_response(monkeypatch: pytest.MonkeyPatch) -> N
     assert snapshot.humidity_percent == pytest.approx(60)
     assert snapshot.wind_speed_kph == pytest.approx(14.2)
     assert snapshot.conditions == "Overcast"
+    assert snapshot.precipitation_mm == pytest.approx(0.4)
+    assert snapshot.precipitation_probability == pytest.approx(35.0)
 
 
 def test_open_meteo_client_raises_weather_unavailable_on_http_error(monkeypatch: pytest.MonkeyPatch) -> None:

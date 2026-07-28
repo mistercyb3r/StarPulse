@@ -35,6 +35,8 @@ def get_setup_status(
         dish_port=settings.starlink.dish_port,
         poll_interval_seconds=settings.starlink.poll_interval_seconds,
         port=settings.server.port,
+        weather_latitude=settings.weather.latitude,
+        weather_longitude=settings.weather.longitude,
     )
 
 
@@ -46,21 +48,34 @@ def submit_setup(
     collector: StarlinkPoller = Depends(get_collector),
     db: Session = Depends(get_db),
 ) -> SetupResponse:
-    update_config_file(
-        settings.config_file,
-        {
-            "starlink": {
-                "dish_host": payload.dish_host,
-                "poll_interval_seconds": payload.poll_interval_seconds,
-            },
-            "server": {"port": payload.port},
+    weather_updates: dict[str, object] = {}
+    # Optional: only touch [weather] when the wizard provides a full lat/lon pair.
+    # Omitting both leaves any previously configured location alone.
+    if payload.weather_latitude is not None and payload.weather_longitude is not None:
+        weather_updates = {
+            "latitude": payload.weather_latitude,
+            "longitude": payload.weather_longitude,
+        }
+
+    updates: dict[str, dict[str, object]] = {
+        "starlink": {
+            "dish_host": payload.dish_host,
+            "poll_interval_seconds": payload.poll_interval_seconds,
         },
-    )
+        "server": {"port": payload.port},
+    }
+    if weather_updates:
+        updates["weather"] = weather_updates
+
+    update_config_file(settings.config_file, updates)
 
     # Apply what can take effect immediately.
     settings.starlink.dish_host = payload.dish_host
     settings.starlink.poll_interval_seconds = payload.poll_interval_seconds
     settings.server.port = payload.port
+    if payload.weather_latitude is not None and payload.weather_longitude is not None:
+        settings.weather.latitude = payload.weather_latitude
+        settings.weather.longitude = payload.weather_longitude
 
     client_factory = request.app.state.starlink_client_factory
     new_client = client_factory(payload.dish_host, settings.starlink.dish_port)

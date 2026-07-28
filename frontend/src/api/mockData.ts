@@ -8,6 +8,9 @@ import type {
   StarlinkSummaryResponse,
   SummaryPeriod,
   TelemetrySample,
+  WeatherHistoryPeriod,
+  WeatherHistoryResponse,
+  WeatherImpactResponse,
   WeatherResponse,
 } from "./types";
 
@@ -148,11 +151,70 @@ export function generateMockWeather(): WeatherResponse {
     humidity_percent: 68,
     wind_speed_kph: 13.5,
     conditions: "Partly cloudy",
+    precipitation_mm: 0.0,
+    precipitation_probability: 10,
     latitude: 51.5074,
     longitude: -0.1278,
     location_source: "configured",
     fetched_at: new Date().toISOString(),
     message: null,
+  };
+}
+
+export function generateMockWeatherImpact(): WeatherImpactResponse {
+  return {
+    available: true,
+    severity: "Low",
+    reasons: ["Clear sky", "Low wind", "No rain"],
+    conditions: "Partly cloudy",
+    temperature_c: 16.5,
+    wind_speed_kph: 13.5,
+    precipitation_probability: 10,
+    precipitation_mm: 0.0,
+    latency_ms: 26.5,
+    download_bps: 245_000_000,
+    upload_bps: 18_000_000,
+    latency_delta_percent: 2.0,
+    download_delta_percent: -3.0,
+    active_outage: false,
+    sample_count: 120,
+    message: null,
+  };
+}
+
+export function generateMockWeatherHistory(period: WeatherHistoryPeriod = "24h"): WeatherHistoryResponse {
+  const hours = period === "24h" ? 24 : period === "7d" ? 24 * 7 : 24 * 30;
+  const stepMs = period === "24h" ? 30 * 60 * 1000 : period === "7d" ? 3 * 60 * 60 * 1000 : 12 * 60 * 60 * 1000;
+  const now = Date.now();
+  const points = Math.max(8, Math.floor((hours * 60 * 60 * 1000) / stepMs));
+  const weather = [];
+  const performance = [];
+  for (let i = 0; i < points; i++) {
+    const ts = new Date(now - (points - 1 - i) * stepMs).toISOString();
+    const rainChance = i > points * 0.6 && i < points * 0.75 ? 70 + (i % 10) : 5 + (i % 8);
+    weather.push({
+      timestamp: ts,
+      temperature_c: 14 + (i % 6),
+      wind_speed_kph: 10 + (i % 8),
+      precipitation_mm: rainChance > 50 ? 1.2 : 0,
+      precipitation_probability: rainChance,
+      conditions: rainChance > 50 ? "Moderate rain" : "Partly cloudy",
+    });
+    performance.push({
+      timestamp: ts,
+      average_download_bps: rainChance > 50 ? 120_000_000 : 240_000_000,
+      average_upload_bps: rainChance > 50 ? 8_000_000 : 16_000_000,
+      average_latency_ms: rainChance > 50 ? 48 : 24,
+      sample_count: 20,
+    });
+  }
+  return {
+    period,
+    range_start: weather[0]?.timestamp ?? new Date(now).toISOString(),
+    range_end: weather[weather.length - 1]?.timestamp ?? new Date(now).toISOString(),
+    weather,
+    performance,
+    outages: generateMockOutageSummary().events,
   };
 }
 

@@ -10,12 +10,16 @@ interface FormState {
   dish_host: string;
   poll_interval_seconds: string;
   port: string;
+  weather_latitude: string;
+  weather_longitude: string;
 }
 
 const DEFAULT_FORM: FormState = {
   dish_host: "192.168.100.1",
   poll_interval_seconds: "5",
   port: "8000",
+  weather_latitude: "",
+  weather_longitude: "",
 };
 
 export function SetupWizard({ onComplete }: SetupWizardProps) {
@@ -34,6 +38,8 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
           dish_host: status.dish_host,
           poll_interval_seconds: String(status.poll_interval_seconds),
           port: String(status.port),
+          weather_latitude: status.weather_latitude != null ? String(status.weather_latitude) : "",
+          weather_longitude: status.weather_longitude != null ? String(status.weather_longitude) : "",
         });
       })
       .catch(() => {
@@ -54,12 +60,26 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
     setRestartNotice(null);
     setIsSubmitting(true);
 
+    const latRaw = form.weather_latitude.trim();
+    const lonRaw = form.weather_longitude.trim();
+    const hasLat = latRaw !== "";
+    const hasLon = lonRaw !== "";
+    if (hasLat !== hasLon) {
+      setError("Provide both weather latitude and longitude, or leave both blank to use dish GPS.");
+      setIsSubmitting(false);
+      return;
+    }
+
     try {
-      const response = await submitSetup({
+      const payload = {
         dish_host: form.dish_host.trim(),
         poll_interval_seconds: Number(form.poll_interval_seconds),
         port: Number(form.port),
-      });
+        ...(hasLat && hasLon
+          ? { weather_latitude: Number(latRaw), weather_longitude: Number(lonRaw) }
+          : {}),
+      };
+      const response = await submitSetup(payload);
       if (response.restart_required) {
         setRestartNotice(response.message);
       } else {
@@ -134,6 +154,37 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               required
             />
             <span className="setup-wizard__hint">Changing this requires restarting StarPulse afterwards.</span>
+          </label>
+
+          <label className="setup-wizard__field">
+            <span>Weather latitude (optional)</span>
+            <input
+              type="number"
+              min="-90"
+              max="90"
+              step="0.0001"
+              value={form.weather_latitude}
+              onChange={(event) => setForm((current) => ({ ...current, weather_latitude: event.target.value }))}
+              placeholder="Leave blank to use dish GPS"
+              disabled={fieldsDisabled}
+            />
+          </label>
+
+          <label className="setup-wizard__field">
+            <span>Weather longitude (optional)</span>
+            <input
+              type="number"
+              min="-180"
+              max="180"
+              step="0.0001"
+              value={form.weather_longitude}
+              onChange={(event) => setForm((current) => ({ ...current, weather_longitude: event.target.value }))}
+              placeholder="Leave blank to use dish GPS"
+              disabled={fieldsDisabled}
+            />
+            <span className="setup-wizard__hint">
+              Used for local weather and Weather Impact Analysis. Dish GPS is preferred when left blank.
+            </span>
           </label>
 
           {error && <p className="setup-wizard__error">{error}</p>}

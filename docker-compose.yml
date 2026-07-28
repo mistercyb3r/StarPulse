@@ -1,0 +1,57 @@
+# Runs StarPulse as two containers: the FastAPI backend (+ collector +
+# SQLite) and the nginx-served React frontend. See .env.example for the
+# environment variables this file reads.
+#
+#   docker compose up -d --build
+#   open http://localhost:${STARPULSE_WEB_PORT:-8080}
+#
+# All persistent state (config.toml, the SQLite database, logs) lives on
+# the "starpulse-data" named volume, mounted at /data in the backend
+# container, so it survives `docker compose restart`/`down` (but not
+# `down -v`, which explicitly removes volumes).
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: starpulse-backend
+    restart: unless-stopped
+    environment:
+      STARPULSE_DATA_DIR: /data
+      STARPULSE_HOST: 0.0.0.0
+      STARPULSE_PORT: 8000
+      STARPULSE_LOG_LEVEL: ${STARPULSE_LOG_LEVEL:-INFO}
+      STARPULSE_LOG_FILE: /data/starpulse.log
+    volumes:
+      - starpulse-data:/data
+    ports:
+      - "${STARPULSE_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/api/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: starpulse-frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${STARPULSE_WEB_PORT:-8080}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  starpulse-data:
+    name: starpulse-data

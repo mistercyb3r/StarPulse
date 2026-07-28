@@ -1,0 +1,97 @@
+from __future__ import annotations
+
+import grpc
+import pytest
+import starlink_grpc
+
+from starpulse.collector.client import GrpcStarlinkClient, StarlinkUnavailableError
+
+RAW_STATUS = {
+    "state": "CONNECTED",
+    "uptime": 98765,
+    "snr": None,
+    "pop_ping_drop_rate": 0.02,
+    "downlink_throughput_bps": 123_456_789.0,
+    "uplink_throughput_bps": 9_876_543.0,
+    "pop_ping_latency_ms": 27.3,
+    "fraction_obstructed": 0.015,
+    "currently_obstructed": True,
+}
+
+
+def _status_data_ok(context=None):
+    return RAW_STATUS, {}, {}
+
+
+def _history_bulk_data_ok(parse_samples, context=None):
+    return {"samples": 1, "end_counter": 1}, {"power_w": [42.5]}
+
+
+def test_fetch_sample_maps_status_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(starlink_grpc, "status_data", _status_data_ok)
+    monkeypatch.setattr(starlink_grpc, "history_bulk_data", _history_bulk_data_ok)
+
+    client = GrpcStarlinkClient(host="dish.example", port=9200)
+    sample = client.fetch_sample()
+
+    assert sample.connection_state == "CONNECTED"
+    assert sample.uptime_seconds == 98765
+    assert sample.download_bps == 123_456_789.0
+    assert sample.upload_bps == 9_876_543.0
+    assert sample.latency_ms == 27.3
+    assert sample.ping_drop_rate == 0.02
+    assert sample.obstruction_percent == pytest.approx(1.5)
+    assert sample.currently_obstructed is True
+    assert sample.snr is None
+    assert sample.power_watts == 42.5
+
+
+def test_fetch_sample_wraps_grpc_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    def raise_rpc_error(context=None):
+        raise grpc.RpcError("dish unreachable")
+
+    monkeypatch.setattr(starlink_grpc, "status_data", raise_rpc_error)
+
+    client = GrpcStarlinkClient(host="dish.example", port=9200)
+    with pytest.raises(StarlinkUnavailableError):
+        client.fetch_sample()
+
+
+def test_fetch_sample_wraps_starlink_grpc_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def raise_grpc_error(context=None):
+        raise starlink_grpc.GrpcError("protocol mismatch")
+
+    monkeypatch.setattr(starlink_grpc, "status_data", raise_grpc_error)
+
+    client = GrpcStarlinkClient(host="dish.example", port=9200)
+    with pytest.raises(StarlinkUnavailableError):
+        client.fetch_sample()
+
+
+def test_fetch_sample_tolerates_power_fetch_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(starlink_grpc, "status_data", _status_data_ok)
+
+    def raise_history_error(parse_samples, context=None):
+        raise starlink_grpc.GrpcError("history unavailable")
+
+    monkeypatch.setattr(starlink_grpc, "history_bulk_data", raise_history_error)
+
+    client = GrpcStarlinkClient(host="dish.example", port=9200)
+    sample = client.fetch_sample()
+
+    assert sample.connection_state == "CONNECTED"
+    assert sample.power_watts is None
+
+
+def test_close_closes_underlying_channel_context() -> None:
+    closed = {"value": False}
+
+    class FakeContext:
+        def close(self) -> None:
+            closed["value"] = True
+
+    client = GrpcStarlinkClient()
+    client._context = FakeContext()  # type: ignore[assignment]
+    client.close()
+
+    assert closed["value"] is True

@@ -1,0 +1,112 @@
+.setup-wizard {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+}
+
+.setup-wizard__card {
+  width: 100%;
+  max-width: 440px;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  padding: 2rem;
+}
+
+.setup-wizard__title {
+  margin: 0 0 0.4rem;
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.setup-wizard__subtitle {
+  margin: 0 0 1.5rem;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.setup-wizard__form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.setup-wizard__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.setup-wizard__field input {
+  font: inherit;
+  font-weight: 400;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.75rem;
+}
+
+.setup-wizard__field input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.setup-wizard__field input:disabled {
+  opacity: 0.6;
+}
+
+.setup-wizard__hint {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.setup-wizard__error {
+  margin: 0;
+  color: var(--bad);
+  font-size: 0.85rem;
+}
+
+.setup-wizard__notice {
+  background: color-mix(in srgb, var(--warn) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  color: var(--warn);
+  border-radius: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.85rem;
+  margin-bottom: 1.1rem;
+  line-height: 1.5;
+}
+
+.setup-wizard__link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: inherit;
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+}
+
+.setup-wizard__submit {
+  font: inherit;
+  font-weight: 600;
+  color: #06131f;
+  background: var(--accent);
+  border: none;
+  border-radius: 0.6rem;
+  padding: 0.7rem 1rem;
+  cursor: pointer;
+}
+
+.setup-wizard__submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

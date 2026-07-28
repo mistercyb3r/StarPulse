@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# StarPulse runtime data (local database, generated config, logs)
+/data/
+*.db
+*.db-journal
+*.log
+
+# Local dev tooling (e.g. portable Node.js, not part of the project)
+/.tools/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

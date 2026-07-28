@@ -100,7 +100,7 @@ def test_location_gps_locked_but_coordinates_not_collected(tmp_path: Path) -> No
     assert body["available"] is False
     assert body["coordinates_collected"] is False
     assert body["gps_valid"] is True
-    assert body["message"] == "Coordinates: Not collected yet"
+    assert "Coordinates: Not collected yet" in body["message"]
     assert body["latitude"] is None
     assert body["longitude"] is None
 
@@ -140,4 +140,5 @@ def test_weather_message_when_gps_locked_without_coords(tmp_path: Path) -> None:
     assert response.status_code == 200
     body = response.json()
     assert body["available"] is False
-    assert body["message"] == "Coordinates: Not collected yet"
+    assert "Coordinates: Not collected yet" in body["message"]
+    assert "location sharing" in body["message"].lower() or "latitude" in body["message"].lower()

@@ -174,13 +174,26 @@ def _resolve_configured(settings: Settings) -> ResolvedLocation | None:
 
 
 def _unavailable_message(*, gps_valid: bool | None, gps_enabled: bool | None) -> str:
+    """Explain missing coordinates without inventing a location.
+
+    ``status_data`` can report GPS locked while ``location_data`` still
+    returns no lat/lon (location sharing not authorized). Manual
+    ``[weather] latitude`` / ``longitude`` (setup wizard or config) is the
+    supported fallback.
+    """
     if gps_enabled is False:
-        return "GPS: Disabled — coordinates not collected"
+        return "GPS: Disabled — set weather latitude/longitude in setup or config"
     if gps_valid is True:
-        return "Coordinates: Not collected yet"
+        return (
+            "Coordinates: Not collected yet — enable dish location sharing, "
+            "or set weather latitude/longitude in setup"
+        )
     if gps_valid is False:
         return "GPS: Searching — coordinates not collected yet"
-    return "location unavailable"
+    return (
+        "location unavailable — set weather latitude/longitude in setup, "
+        "or wait for dish GPS coordinates"
+    )
 
 
 def _load_stored_location(session: Session) -> ResolvedLocation | None:

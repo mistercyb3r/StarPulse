@@ -56,6 +56,10 @@ def test_fetch_sample_maps_status_fields(monkeypatch: pytest.MonkeyPatch) -> Non
     assert sample.gps_valid is True
     assert sample.gps_enabled is True
     assert sample.gps_satellites == 14
+    # status_data never includes coordinates — those come from location_data only.
+    assert sample.latitude is None
+    assert sample.longitude is None
+    assert sample.altitude_m is None
     assert sample.azimuth_deg == pytest.approx(172.4)
     assert sample.elevation_deg == pytest.approx(58.9)
 

@@ -255,3 +255,45 @@ def test_poll_once_tolerates_client_without_fetch_location(tmp_path: Path) -> No
 
     assert row is not None
     assert poller.dish_location is None
+
+
+def test_poll_once_logs_when_gps_locked_but_coordinates_unavailable(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    client = FakeStarlinkClient(
+        samples=[make_sample(gps_valid=True), make_sample(gps_valid=True)],
+        location=None,
+    )
+    poller = StarlinkPoller(client, db, interval_seconds=999)
+
+    with caplog.at_level("WARNING"):
+        row = poller.poll_once()
+        poller.poll_once()  # should not spam a second identical warning
+
+    assert row is not None
+    assert row.latitude is None
+    assert row.longitude is None
+    assert poller.dish_location is None
+    matches = [record for record in caplog.records if "Starlink GPS locked but coordinates unavailable" in record.message]
+    assert len(matches) == 1
+
+
+def test_poll_once_stores_altitude_when_location_sharing_returns_coords(tmp_path: Path) -> None:
+    from starpulse.collector.client import DishCoordinates
+
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    client = FakeStarlinkClient(
+        samples=[make_sample(gps_valid=True)],
+        location=DishCoordinates(latitude=52.4, longitude=0.7, altitude_m=19.0),
+    )
+    poller = StarlinkPoller(client, db, interval_seconds=999)
+
+    row = poller.poll_once()
+
+    assert row is not None
+    assert row.latitude == pytest.approx(52.4)
+    assert row.longitude == pytest.approx(0.7)
+    assert row.altitude_m == pytest.approx(19.0)

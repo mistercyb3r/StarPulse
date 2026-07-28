@@ -63,7 +63,8 @@ def test_build_location_status_locked_without_coordinates(tmp_path: Path) -> Non
         assert status.available is False
         assert status.coordinates_collected is False
         assert status.gps_valid is True
-        assert status.message == "Coordinates: Not collected yet"
+        assert status.message is not None
+        assert "Coordinates: Not collected yet" in status.message
     finally:
         session.close()
 

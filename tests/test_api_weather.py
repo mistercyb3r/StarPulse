@@ -51,7 +51,7 @@ def _make_app(tmp_path: Path, weather_client, env: dict[str, str] | None = None)
 
 
 def test_weather_unavailable_when_no_location(tmp_path: Path) -> None:
-    """Case 3: no configured coords and no dish GPS → location unavailable."""
+    """No configured coords and no dish GPS → location unavailable."""
     app = _make_app(tmp_path, FakeWeatherClient(Exception("should not be called")))
     with TestClient(app) as client:
         response = client.get("/api/weather")
@@ -60,7 +60,8 @@ def test_weather_unavailable_when_no_location(tmp_path: Path) -> None:
     body = response.json()
     assert body["available"] is False
     assert body["temperature_c"] is None
-    assert body["message"] == "location unavailable"
+    assert body["message"] is not None
+    assert "unavailable" in body["message"].lower() or "latitude" in body["message"].lower()
 
 
 def test_weather_unavailable_when_disabled(tmp_path: Path) -> None:

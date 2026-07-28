@@ -47,6 +47,7 @@ class StarlinkPoller:
         self._thread: Optional[threading.Thread] = None
         self._last_poll_ok: Optional[bool] = None
         self._dish_location: Optional[DishCoordinates] = None
+        self._logged_gps_locked_without_coords = False
 
     @property
     def is_running(self) -> bool:
@@ -89,6 +90,7 @@ class StarlinkPoller:
         self._interval_seconds = interval_seconds
         self._last_poll_ok = None
         self._dish_location = None
+        self._logged_gps_locked_without_coords = False
 
         if was_running:
             self.start()
@@ -143,10 +145,19 @@ class StarlinkPoller:
         return row
 
     def _attach_dish_location(self, sample):
-        """Refresh/cache dish GPS and copy the latest known coords onto the sample."""
+        """Refresh/cache dish GPS and copy the latest known coords onto the sample.
+
+        Coordinates come from the separate ``get_location`` RPC (location
+        sharing), not from status ``gps_ready``. GPS can be locked while
+        coordinates remain unavailable.
+        """
         fetched = self._safe_fetch_location()
         if fetched is not None:
             self._dish_location = fetched
+            self._logged_gps_locked_without_coords = False
+        elif sample.gps_valid and self._dish_location is None:
+            self._note_gps_locked_without_coordinates()
+
         if self._dish_location is None:
             return sample
         coords = self._dish_location
@@ -157,6 +168,13 @@ class StarlinkPoller:
             altitude_m=coords.altitude_m,
         )
 
+    def _note_gps_locked_without_coordinates(self) -> None:
+        """Log once until coordinates appear, so a 5s poll interval doesn't spam."""
+        if self._logged_gps_locked_without_coords:
+            return
+        logger.warning("Starlink GPS locked but coordinates unavailable")
+        self._logged_gps_locked_without_coords = True
+
     def _safe_fetch_location(self) -> Optional[DishCoordinates]:
         """Best-effort fetch of the dish's GPS position.
 
@@ -164,6 +182,7 @@ class StarlinkPoller:
         optional, duck-typed rather than part of the core protocol), and
         even when it does, the dish may not have location sharing
         authorized — either case just means "no location", not an error.
+        ``status_data`` never includes lat/lon; only ``location_data`` does.
         """
         fetch_location = getattr(self._client, "fetch_location", None)
         if fetch_location is None:

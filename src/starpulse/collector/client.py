@@ -135,10 +135,13 @@ class GrpcStarlinkClient:
     def fetch_location(self) -> DishCoordinates | None:
         """Best-effort fetch of the dish's GPS position.
 
-        Requires location sharing to be authorized on the dish; returns
-        ``None`` (rather than raising) whenever it isn't, since that's a
-        normal, expected outcome, not a failure. GPS lock
-        (``gps_ready`` on status) does **not** imply coordinates are shared.
+        ``starlink_grpc.status_data()`` does **not** include latitude or
+        longitude — only GPS lock flags (``gps_ready`` / ``gps_enabled`` /
+        ``gps_sats``). Coordinates come solely from
+        ``starlink_grpc.location_data()``, which requires location sharing
+        to be authorized on the dish. When sharing is off, that RPC returns
+        null coordinates (or PERMISSION_DENIED); we treat that as ``None``
+        rather than inventing a location.
         """
         try:
             location = starlink_grpc.location_data(context=self._context)
@@ -149,6 +152,9 @@ class GrpcStarlinkClient:
         latitude = location.get("latitude")
         longitude = location.get("longitude")
         if latitude is None or longitude is None:
+            logger.debug(
+                "Dish location RPC returned no coordinates (location sharing likely disabled)"
+            )
             return None
         altitude = location.get("altitude")
         return DishCoordinates(

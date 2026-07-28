@@ -23,15 +23,17 @@ export function LocationCard({ location }: LocationCardProps) {
   }
 
   if (!location.available || !location.coordinates_collected) {
-    return (
-      <InfoCard
-        title="📍 Location"
-        rows={[
-          { label: "GPS", value: gpsStatusLabel(location) },
-          { label: "Coordinates", value: "Not collected yet" },
-        ]}
-      />
-    );
+    const rows = [
+      { label: "GPS", value: gpsStatusLabel(location) },
+      { label: "Coordinates", value: "Not collected yet" },
+    ];
+    if (location.gps_valid === true) {
+      rows.push({
+        label: "Fallback",
+        value: "Enable dish location sharing, or set lat/lon in setup",
+      });
+    }
+    return <InfoCard title="📍 Location" rows={rows} />;
   }
 
   const place =

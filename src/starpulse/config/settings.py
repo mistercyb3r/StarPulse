@@ -55,9 +55,9 @@ class StarlinkSettings(BaseModel):
 
 class WeatherSettings(BaseModel):
     enabled: bool = True
-    # None (from a blank "" in config.toml) means "no fixed location
-    # configured" — the weather endpoint then falls back to the dish's own
-    # GPS position, if the dish has location sharing enabled.
+    # None (from a blank "" in config.toml) means "no manual fallback
+    # configured". Dish GPS coordinates (from location_data, not mere GPS
+    # lock) are preferred when available; otherwise these values are used.
     latitude: float | None = None
     longitude: float | None = None
     cache_seconds: float = 600.0

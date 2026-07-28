@@ -183,7 +183,9 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               disabled={fieldsDisabled}
             />
             <span className="setup-wizard__hint">
-              Used for local weather and Weather Impact Analysis. Dish GPS is preferred when left blank.
+              Fallback when the dish does not share GPS coordinates (GPS lock alone is not enough).
+              Enable location sharing on the dish for automatic weather location, or enter both
+              latitude and longitude here.
             </span>
           </label>
 

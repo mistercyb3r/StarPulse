@@ -19,6 +19,24 @@ export function formatWatts(watts: number | null | undefined): string {
   return `${watts.toFixed(1)} W`;
 }
 
+export function formatTemperature(celsius: number | null | undefined): string {
+  if (celsius === null || celsius === undefined) return "—";
+  return `${celsius.toFixed(1)}°C`;
+}
+
+export function formatWindSpeed(kph: number | null | undefined): string {
+  if (kph === null || kph === undefined) return "—";
+  return `${kph.toFixed(1)} km/h`;
+}
+
+export function formatMinutes(minutes: number | null | undefined): string {
+  if (minutes === null || minutes === undefined) return "—";
+  if (minutes < 60) return `${minutes.toFixed(minutes < 10 ? 1 : 0)} min`;
+  const hours = Math.floor(minutes / 60);
+  const remaining = Math.round(minutes % 60);
+  return `${hours}h ${remaining}m`;
+}
+
 export function formatDuration(totalSeconds: number | null | undefined): string {
   if (totalSeconds === null || totalSeconds === undefined) return "—";
   const days = Math.floor(totalSeconds / 86400);

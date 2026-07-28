@@ -1,11 +1,14 @@
 import type {
+  ConnectionEventResponse,
   DishInfoResponse,
   HealthResponse,
+  OutageSummaryResponse,
   StarlinkHealthResponse,
   StarlinkHistoryResponse,
   StarlinkSummaryResponse,
   SummaryPeriod,
   TelemetrySample,
+  WeatherResponse,
 } from "./types";
 
 /**
@@ -93,19 +96,28 @@ export function generateMockSummary(period: SummaryPeriod = "24h"): StarlinkSumm
   const average = (values: number[]) => (values.length === 0 ? null : values.reduce((a, b) => a + b, 0) / values.length);
   const peak = (values: number[]) => (values.length === 0 ? null : Math.max(...values));
 
+  const low = (values: number[]) => (values.length === 0 ? null : Math.min(...values));
+
   const connectedCount = samples.filter((s) => s.connection_state === "CONNECTED").length;
   const downloadValues = numeric(samples.map((s) => s.download_bps));
   const uploadValues = numeric(samples.map((s) => s.upload_bps));
+  const latencyValues = numeric(samples.map((s) => s.latency_ms));
+  const powerValues = numeric(samples.map((s) => s.power_watts));
 
   return {
     sample_count: samples.length,
     average_download_bps: average(downloadValues),
     average_upload_bps: average(uploadValues),
-    average_latency_ms: average(numeric(samples.map((s) => s.latency_ms))),
+    average_latency_ms: average(latencyValues),
     uptime_percent: (connectedCount / samples.length) * 100,
     average_obstruction_percent: average(numeric(samples.map((s) => s.obstruction_percent))),
     peak_download_bps: peak(downloadValues),
     peak_upload_bps: peak(uploadValues),
+    best_latency_ms: low(latencyValues),
+    worst_latency_ms: peak(latencyValues),
+    average_power_watts: average(powerValues),
+    min_power_watts: low(powerValues),
+    max_power_watts: peak(powerValues),
     range_start: samples[0]?.timestamp ?? null,
     range_end: samples[samples.length - 1]?.timestamp ?? null,
   };
@@ -123,6 +135,49 @@ export function generateMockStarlinkHealth(): StarlinkHealthResponse {
     sample_count: 12,
     range_start: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
     range_end: new Date().toISOString(),
+  };
+}
+
+export function generateMockWeather(): WeatherResponse {
+  return {
+    available: true,
+    temperature_c: 16.5,
+    feels_like_c: 15.0,
+    humidity_percent: 68,
+    wind_speed_kph: 13.5,
+    conditions: "Partly cloudy",
+    latitude: 51.5074,
+    longitude: -0.1278,
+    location_source: "configured",
+    fetched_at: new Date().toISOString(),
+    message: null,
+  };
+}
+
+export function generateMockOutageSummary(): OutageSummaryResponse {
+  const now = Date.now();
+  const events: ConnectionEventResponse[] = [
+    {
+      id: 1,
+      start_time: new Date(now - 5 * 60 * 60 * 1000).toISOString(),
+      end_time: new Date(now - 5 * 60 * 60 * 1000 + 3 * 60 * 1000).toISOString(),
+      duration_seconds: 180,
+      reason: "high_packet_loss",
+    },
+    {
+      id: 2,
+      start_time: new Date(now - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      end_time: new Date(now - 2 * 24 * 60 * 60 * 1000 + 8 * 60 * 1000).toISOString(),
+      duration_seconds: 480,
+      reason: "disconnected",
+    },
+  ];
+
+  return {
+    outages_today: 1,
+    outages_last_7d: events.length,
+    total_downtime_minutes_last_7d: events.reduce((sum, e) => sum + (e.duration_seconds ?? 0), 0) / 60,
+    events,
   };
 }
 

@@ -56,3 +56,17 @@
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 1rem;
 }
+
+@media (max-width: 480px) {
+  .performance-stats__periods {
+    width: 100%;
+  }
+
+  .performance-stats__period {
+    flex: 1;
+  }
+
+  .performance-stats__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}

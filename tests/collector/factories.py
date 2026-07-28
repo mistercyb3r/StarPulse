@@ -45,11 +45,18 @@ class FakeStarlinkClient:
     a dish that has gone offline.
     """
 
-    def __init__(self, samples: list[StarlinkSample] | None = None, error: Exception | None = None) -> None:
+    def __init__(
+        self,
+        samples: list[StarlinkSample] | None = None,
+        error: Exception | None = None,
+        location: tuple[float, float] | None = None,
+    ) -> None:
         self._samples = list(samples) if samples is not None else []
         self._error = error
+        self._location = location
         self.closed = False
         self.fetch_calls = 0
+        self.location_calls = 0
 
     def fetch_sample(self) -> StarlinkSample:
         self.fetch_calls += 1
@@ -58,6 +65,10 @@ class FakeStarlinkClient:
         if self._error is not None:
             raise self._error
         raise StarlinkUnavailableError("FakeStarlinkClient has no more samples queued")
+
+    def fetch_location(self) -> tuple[float, float] | None:
+        self.location_calls += 1
+        return self._location
 
     def close(self) -> None:
         self.closed = True

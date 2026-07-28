@@ -9,9 +9,11 @@ CLI command, or a standalone script without any web framework involved.
 from __future__ import annotations
 
 import threading
+from datetime import datetime, timezone
 from typing import Callable, Optional
 
 from starpulse.collector.client import StarlinkClient, StarlinkUnavailableError
+from starpulse.collector.outages import OutageTracker
 from starpulse.collector.repository import save_sample
 from starpulse.db.models import TelemetrySample
 from starpulse.db.session import Database
@@ -33,14 +35,18 @@ class StarlinkPoller:
         database: Database,
         interval_seconds: float,
         on_error: Optional[Callable[[Exception], None]] = None,
+        outage_tracker: Optional[OutageTracker] = None,
     ) -> None:
         self._client = client
         self._database = database
         self._interval_seconds = interval_seconds
         self._on_error = on_error
+        self._outage_tracker = outage_tracker
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._last_poll_ok: Optional[bool] = None
+        self._dish_location: Optional[tuple[float, float]] = None
+        self._location_checked = False
 
     @property
     def is_running(self) -> bool:
@@ -54,6 +60,16 @@ class StarlinkPoller:
         right after startup, or when the poller was never started).
         """
         return self._last_poll_ok
+
+    @property
+    def dish_location(self) -> Optional[tuple[float, float]]:
+        """The dish's GPS (latitude, longitude), if location sharing is enabled on it.
+
+        ``None`` until the poller has had a chance to check (once, on its
+        first successful poll after startup or a reconfigure), or if the
+        dish doesn't support/authorize location sharing.
+        """
+        return self._dish_location
 
     def reconfigure(self, client: StarlinkClient, interval_seconds: float) -> None:
         """Swap in a new client/interval, e.g. after the setup wizard changes them.
@@ -71,6 +87,8 @@ class StarlinkPoller:
         self._client = client
         self._interval_seconds = interval_seconds
         self._last_poll_ok = None
+        self._dish_location = None
+        self._location_checked = False
 
         if was_running:
             self.start()
@@ -104,18 +122,44 @@ class StarlinkPoller:
         except StarlinkUnavailableError as exc:
             logger.warning("Skipping telemetry sample: %s", exc)
             self._last_poll_ok = False
+            if self._outage_tracker is not None:
+                self._outage_tracker.record_failure(datetime.now(timezone.utc))
             if self._on_error is not None:
                 self._on_error(exc)
             return None
+
+        if not self._location_checked:
+            self._location_checked = True
+            self._dish_location = self._safe_fetch_location()
 
         session = next(self._database.get_session())
         try:
             row = save_sample(session, sample)
             logger.debug("Stored telemetry sample from %s", sample.timestamp)
             self._last_poll_ok = True
-            return row
         finally:
             session.close()
+
+        if self._outage_tracker is not None:
+            self._outage_tracker.record_success(sample)
+        return row
+
+    def _safe_fetch_location(self) -> Optional[tuple[float, float]]:
+        """Best-effort, once-per-lifetime fetch of the dish's GPS position.
+
+        Not every ``StarlinkClient`` implements ``fetch_location`` (it's
+        optional, duck-typed rather than part of the core protocol), and
+        even when it does, the dish may not have location sharing
+        authorized — either case just means "no location", not an error.
+        """
+        fetch_location = getattr(self._client, "fetch_location", None)
+        if fetch_location is None:
+            return None
+        try:
+            return fetch_location()
+        except Exception:
+            logger.debug("Could not fetch dish location", exc_info=True)
+            return None
 
     def _run(self) -> None:
         while not self._stop_event.is_set():

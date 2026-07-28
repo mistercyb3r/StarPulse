@@ -67,6 +67,11 @@ class StarlinkSummaryResponse(BaseModel):
     average_obstruction_percent: float | None
     peak_download_bps: float | None
     peak_upload_bps: float | None
+    best_latency_ms: float | None
+    worst_latency_ms: float | None
+    average_power_watts: float | None
+    min_power_watts: float | None
+    max_power_watts: float | None
     range_start: datetime | None
     range_end: datetime | None
 
@@ -105,6 +110,50 @@ class DishInfoResponse(BaseModel):
     azimuth_deg: float | None
     elevation_deg: float | None
     last_updated: datetime = Field(validation_alias="timestamp")
+
+
+class ConnectionEventResponse(BaseModel):
+    """A single period of degraded connectivity."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    start_time: datetime
+    end_time: datetime | None
+    duration_seconds: float | None
+    # One of: "disconnected", "high_packet_loss", "dish_unavailable".
+    reason: str
+
+
+class OutageSummaryResponse(BaseModel):
+    """Outage counts and downtime for the "Connection History" dashboard section."""
+
+    outages_today: int
+    outages_last_7d: int
+    total_downtime_minutes_last_7d: float
+    events: list[ConnectionEventResponse]
+
+
+class WeatherResponse(BaseModel):
+    """Current weather at the dish's location (dish GPS, or a configured fallback).
+
+    ``available`` is ``False`` (with all data fields ``None``) when weather
+    is disabled, no location is known yet, or the upstream API is
+    unreachable — ``message`` explains why in that case.
+    """
+
+    available: bool
+    temperature_c: float | None = None
+    feels_like_c: float | None = None
+    humidity_percent: float | None = None
+    wind_speed_kph: float | None = None
+    conditions: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    # One of: "dish_gps", "configured", or None when unavailable.
+    location_source: str | None = None
+    fetched_at: datetime | None = None
+    message: str | None = None
 
 
 class SetupStatusResponse(BaseModel):

@@ -12,11 +12,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from starpulse.collector.client import StarlinkSample
-from starpulse.db.models import TelemetrySample
+from starpulse.db.models import ConnectionEvent, TelemetrySample
 
 CONNECTED_STATE = "CONNECTED"
 
@@ -89,6 +89,11 @@ class SummaryStats:
     uptime_percent: float | None
     peak_download_bps: float | None
     peak_upload_bps: float | None
+    best_latency_ms: float | None
+    worst_latency_ms: float | None
+    average_power_watts: float | None
+    min_power_watts: float | None
+    max_power_watts: float | None
 
 
 def get_summary(
@@ -108,6 +113,11 @@ def get_summary(
         func.sum(connected_flag),
         func.max(TelemetrySample.download_bps),
         func.max(TelemetrySample.upload_bps),
+        func.min(TelemetrySample.latency_ms),
+        func.max(TelemetrySample.latency_ms),
+        func.avg(TelemetrySample.power_watts),
+        func.min(TelemetrySample.power_watts),
+        func.max(TelemetrySample.power_watts),
     )
     stmt = _apply_range(stmt, start, end)
 
@@ -120,6 +130,11 @@ def get_summary(
         connected_count,
         peak_download,
         peak_upload,
+        best_latency,
+        worst_latency,
+        avg_power,
+        min_power,
+        max_power,
     ) = session.execute(stmt).one()
 
     uptime_percent = None
@@ -135,6 +150,11 @@ def get_summary(
         uptime_percent=uptime_percent,
         peak_download_bps=peak_download,
         peak_upload_bps=peak_upload,
+        best_latency_ms=best_latency,
+        worst_latency_ms=worst_latency,
+        average_power_watts=avg_power,
+        min_power_watts=min_power,
+        max_power_watts=max_power,
     )
 
 
@@ -238,6 +258,107 @@ def _obstruction_impact(obstruction_percent: float) -> str:
     if obstruction_percent <= 10:
         return "Moderate"
     return "Severe"
+
+
+def get_open_connection_event(session: Session) -> ConnectionEvent | None:
+    """Return the currently in-progress degraded-connection event, if any."""
+    stmt = (
+        select(ConnectionEvent)
+        .where(ConnectionEvent.end_time.is_(None))
+        .order_by(ConnectionEvent.start_time.desc())
+        .limit(1)
+    )
+    return session.execute(stmt).scalar_one_or_none()
+
+
+def upsert_open_connection_event(session: Session, at: datetime, reason: str) -> ConnectionEvent:
+    """Open a new degraded-connection event, or update the reason of the one already open."""
+    open_event = get_open_connection_event(session)
+    if open_event is not None:
+        if open_event.reason != reason:
+            open_event.reason = reason
+            session.commit()
+            session.refresh(open_event)
+        return open_event
+
+    event = ConnectionEvent(start_time=at, end_time=None, reason=reason)
+    session.add(event)
+    session.commit()
+    session.refresh(event)
+    return event
+
+
+def close_open_connection_event(session: Session, end_time: datetime) -> ConnectionEvent | None:
+    """Close the currently open event (if any), recording its final duration."""
+    open_event = get_open_connection_event(session)
+    if open_event is None:
+        return None
+    open_event.end_time = end_time
+    start_time = _ensure_utc(open_event.start_time)
+    open_event.duration_seconds = max((_ensure_utc(end_time) - start_time).total_seconds(), 0.0)
+    session.commit()
+    session.refresh(open_event)
+    return open_event
+
+
+def get_connection_events(
+    session: Session,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    limit: int = 500,
+) -> list[ConnectionEvent]:
+    """Return events overlapping ``[start, end]``, oldest first.
+
+    An event with no ``end_time`` yet (still open/ongoing) is treated as
+    overlapping every range that hasn't ended before it started.
+    """
+    stmt = select(ConnectionEvent)
+    if start is not None:
+        start = _ensure_utc(start)
+        stmt = stmt.where(or_(ConnectionEvent.end_time.is_(None), ConnectionEvent.end_time >= start))
+    if end is not None:
+        stmt = stmt.where(ConnectionEvent.start_time <= _ensure_utc(end))
+    stmt = stmt.order_by(ConnectionEvent.start_time.desc()).limit(limit)
+    rows = list(session.execute(stmt).scalars().all())
+    return list(reversed(rows))
+
+
+@dataclass(frozen=True)
+class OutageSummary:
+    """Outage counts and total downtime, plus the underlying events for a timeline view."""
+
+    outages_today: int
+    outages_last_7d: int
+    total_downtime_minutes_last_7d: float
+    events: list[ConnectionEvent]
+
+
+_OUTAGE_WINDOW = timedelta(days=7)
+
+
+def get_outage_summary(session: Session, now: datetime | None = None) -> OutageSummary:
+    """Summarize connection events from the last 7 days, plus how many started today."""
+    now = now or datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    window_start = now - _OUTAGE_WINDOW
+
+    events = get_connection_events(session, start=window_start, end=now, limit=1000)
+
+    outages_today = sum(1 for event in events if _ensure_utc(event.start_time) >= today_start)
+
+    total_seconds = 0.0
+    for event in events:
+        if event.duration_seconds is not None:
+            total_seconds += event.duration_seconds
+        elif event.end_time is None:
+            total_seconds += max((now - _ensure_utc(event.start_time)).total_seconds(), 0.0)
+
+    return OutageSummary(
+        outages_today=outages_today,
+        outages_last_7d=len(events),
+        total_downtime_minutes_last_7d=round(total_seconds / 60.0, 1),
+        events=events,
+    )
 
 
 def _apply_range(stmt, start: datetime | None, end: datetime | None):

@@ -3,15 +3,21 @@ import { formatBps, formatMs, formatPercent, formatRelativeTime } from "../utils
 import { ConnectionIndicator } from "./ConnectionIndicator";
 import { ConnectionTimeline } from "./charts/ConnectionTimeline";
 import { LatencyHistoryChart } from "./charts/LatencyHistoryChart";
+import { PowerHistoryChart } from "./charts/PowerHistoryChart";
 import { SpeedHistoryChart } from "./charts/SpeedHistoryChart";
 import "./Dashboard.css";
 import { DishInfoCard } from "./DishInfoCard";
+import { InstallPwaButton } from "./InstallPwaButton";
+import { LatencyStatsCard } from "./LatencyStatsCard";
 import { LoadingScreen } from "./LoadingScreen";
 import { MetricCard, type MetricTone } from "./MetricCard";
 import { MockDataBanner } from "./MockDataBanner";
-import { PerformanceStats } from "./PerformanceStats";
+import { OutageHistoryCard } from "./OutageHistoryCard";
+import { PerformanceStats, PERIOD_LABELS } from "./PerformanceStats";
+import { PowerCard } from "./PowerCard";
 import { StarlinkHealthCard } from "./StarlinkHealthCard";
 import { StatusBadge } from "./StatusBadge";
+import { WeatherCard } from "./WeatherCard";
 
 function toneForThreshold(value: number | null | undefined, warnAt: number, badAt: number): MetricTone {
   if (value === null || value === undefined) return "neutral";
@@ -30,11 +36,14 @@ export function Dashboard() {
     performance,
     performancePeriod,
     setPerformancePeriod,
+    weather,
+    outages,
     isLoading,
     isUsingMockData,
     lastUpdated,
   } = useStarlinkTelemetry();
   const samples = history?.samples ?? [];
+  const periodLabel = PERIOD_LABELS[performancePeriod];
 
   if (isLoading) {
     return <LoadingScreen message="Loading Starlink telemetry…" />;
@@ -52,6 +61,7 @@ export function Dashboard() {
           {status && <StatusBadge state={status.connection_state} />}
           {health?.starlink_connected === false && <ConnectionIndicator label="Dish Unreachable" tone="bad" />}
           <span className="dashboard__updated">Updated {formatRelativeTime(lastUpdated?.toISOString() ?? null)}</span>
+          <InstallPwaButton />
         </div>
       </header>
 
@@ -78,9 +88,17 @@ export function Dashboard() {
 
       <PerformanceStats performance={performance} period={performancePeriod} onPeriodChange={setPerformancePeriod} />
 
+      <section className="dashboard__info-grid">
+        <PowerCard current={status} stats={performance} periodLabel={periodLabel} />
+        <LatencyStatsCard current={status} stats={performance} periodLabel={periodLabel} />
+        <WeatherCard weather={weather} />
+        <OutageHistoryCard outages={outages} />
+      </section>
+
       <section className="dashboard__charts">
         <SpeedHistoryChart samples={samples} />
         <LatencyHistoryChart samples={samples} />
+        <PowerHistoryChart samples={samples} />
         <ConnectionTimeline samples={samples} />
       </section>
 

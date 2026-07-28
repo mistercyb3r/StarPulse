@@ -17,12 +17,12 @@ dependencies = [
     "pydantic>=2.6",
     "starlink-grpc-core>=1.2,<2",
     "tomli-w>=1.0",
+    "httpx>=0.27",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
-    "httpx>=0.27",
 ]
 
 [project.scripts]

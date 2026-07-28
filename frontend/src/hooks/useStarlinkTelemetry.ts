@@ -1,21 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getDishInfo, getHealth, getStarlinkHealth, getStarlinkHistory, getStarlinkStatus, getStarlinkSummary } from "../api/client";
+import {
+  getDishInfo,
+  getHealth,
+  getOutages,
+  getStarlinkHealth,
+  getStarlinkHistory,
+  getStarlinkStatus,
+  getStarlinkSummary,
+  getWeather,
+} from "../api/client";
 import {
   generateMockDishInfo,
   generateMockHealth,
   generateMockHistoryResponse,
+  generateMockOutageSummary,
   generateMockStarlinkHealth,
   generateMockStatus,
   generateMockSummary,
+  generateMockWeather,
 } from "../api/mockData";
 import type {
   DishInfoResponse,
   HealthResponse,
+  OutageSummaryResponse,
   StarlinkHealthResponse,
   StarlinkHistoryResponse,
   StarlinkSummaryResponse,
   SummaryPeriod,
   TelemetrySample,
+  WeatherResponse,
 } from "../api/types";
 
 const DEFAULT_POLL_INTERVAL_MS = 5000;
@@ -29,10 +42,12 @@ export interface StarlinkTelemetryState {
   /** Connection quality score (0-100) derived from recent uptime/latency/obstruction. */
   starlinkHealth: StarlinkHealthResponse | null;
   dishInfo: DishInfoResponse | null;
-  /** Average/peak throughput over the selected `performancePeriod`. */
+  /** Average/peak/best/worst stats (throughput, latency, power) over the selected `performancePeriod`. */
   performance: StarlinkSummaryResponse | null;
   performancePeriod: SummaryPeriod;
   setPerformancePeriod: (period: SummaryPeriod) => void;
+  weather: WeatherResponse | null;
+  outages: OutageSummaryResponse | null;
   /** True once the very first fetch (real or mock) has completed. */
   isLoading: boolean;
   /** True when showing generated fallback data because the API was unreachable. */
@@ -59,6 +74,8 @@ export function useStarlinkTelemetry(pollIntervalMs: number = DEFAULT_POLL_INTER
     starlinkHealth: null,
     dishInfo: null,
     performance: null,
+    weather: null,
+    outages: null,
     isLoading: true,
     isUsingMockData: false,
     lastUpdated: null,
@@ -68,13 +85,15 @@ export function useStarlinkTelemetry(pollIntervalMs: number = DEFAULT_POLL_INTER
 
   const refresh = useCallback(async () => {
     try {
-      const [status, history, health, starlinkHealth, dishInfo, performance] = await Promise.all([
+      const [status, history, health, starlinkHealth, dishInfo, performance, weather, outages] = await Promise.all([
         getStarlinkStatus(),
         getStarlinkHistory({ limit: HISTORY_LIMIT }),
         getHealth(),
         getStarlinkHealth(),
         getDishInfo(),
         getStarlinkSummary({ period: performancePeriod }),
+        getWeather(),
+        getOutages(),
       ]);
 
       if (!isMountedRef.current) return;
@@ -85,6 +104,8 @@ export function useStarlinkTelemetry(pollIntervalMs: number = DEFAULT_POLL_INTER
         starlinkHealth,
         dishInfo,
         performance,
+        weather,
+        outages,
         isLoading: false,
         isUsingMockData: false,
         lastUpdated: new Date(),
@@ -98,6 +119,8 @@ export function useStarlinkTelemetry(pollIntervalMs: number = DEFAULT_POLL_INTER
         starlinkHealth: generateMockStarlinkHealth(),
         dishInfo: generateMockDishInfo(),
         performance: generateMockSummary(performancePeriod),
+        weather: generateMockWeather(),
+        outages: generateMockOutageSummary(),
         isLoading: false,
         isUsingMockData: true,
         lastUpdated: new Date(),

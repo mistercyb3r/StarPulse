@@ -6,12 +6,17 @@ from pathlib import Path
 import pytest
 
 from starpulse.collector.repository import (
+    close_open_connection_event,
     count_samples,
+    get_connection_events,
     get_health_score,
     get_latest_sample,
+    get_open_connection_event,
+    get_outage_summary,
     get_recent_samples,
     get_summary,
     save_sample,
+    upsert_open_connection_event,
 )
 from starpulse.db.session import Database
 
@@ -140,6 +145,7 @@ def test_get_summary_computes_averages_and_uptime(tmp_path: Path) -> None:
                 upload_bps=10.0,
                 latency_ms=20.0,
                 obstruction_percent=0.0,
+                power_watts=30.0,
             ),
         )
         save_sample(
@@ -151,6 +157,7 @@ def test_get_summary_computes_averages_and_uptime(tmp_path: Path) -> None:
                 upload_bps=30.0,
                 latency_ms=60.0,
                 obstruction_percent=4.0,
+                power_watts=40.0,
             ),
         )
 
@@ -164,6 +171,11 @@ def test_get_summary_computes_averages_and_uptime(tmp_path: Path) -> None:
         assert stats.uptime_percent == pytest.approx(50.0)
         assert stats.peak_download_bps == pytest.approx(300.0)
         assert stats.peak_upload_bps == pytest.approx(30.0)
+        assert stats.best_latency_ms == pytest.approx(20.0)
+        assert stats.worst_latency_ms == pytest.approx(60.0)
+        assert stats.average_power_watts == pytest.approx(35.0)
+        assert stats.min_power_watts == pytest.approx(30.0)
+        assert stats.max_power_watts == pytest.approx(40.0)
     finally:
         session.close()
 
@@ -266,5 +278,137 @@ def test_get_health_score_defaults_to_last_hour(tmp_path: Path) -> None:
 
         assert health.sample_count == 0
         assert health.score is None
+    finally:
+        session.close()
+
+
+def test_upsert_open_connection_event_creates_then_updates_reason(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    session = next(db.get_session())
+    try:
+        base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+
+        event = upsert_open_connection_event(session, at=base, reason="disconnected")
+        assert event.id is not None
+        assert event.end_time is None
+        assert event.reason == "disconnected"
+
+        # A second call while still open updates the reason in place rather
+        # than creating a second open event.
+        updated = upsert_open_connection_event(session, at=base + timedelta(seconds=5), reason="high_packet_loss")
+        assert updated.id == event.id
+        assert updated.reason == "high_packet_loss"
+        assert updated.start_time.replace(tzinfo=timezone.utc) == base
+
+        open_event = get_open_connection_event(session)
+        assert open_event is not None
+        assert open_event.id == event.id
+    finally:
+        session.close()
+
+
+def test_close_open_connection_event_sets_end_time_and_duration(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    session = next(db.get_session())
+    try:
+        base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        upsert_open_connection_event(session, at=base, reason="disconnected")
+
+        closed = close_open_connection_event(session, end_time=base + timedelta(minutes=2))
+
+        assert closed is not None
+        assert closed.end_time.replace(tzinfo=timezone.utc) == base + timedelta(minutes=2)
+        assert closed.duration_seconds == pytest.approx(120.0)
+        assert get_open_connection_event(session) is None
+    finally:
+        session.close()
+
+
+def test_close_open_connection_event_returns_none_when_nothing_open(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    session = next(db.get_session())
+    try:
+        assert close_open_connection_event(session, end_time=datetime.now(timezone.utc)) is None
+    finally:
+        session.close()
+
+
+def test_get_connection_events_filters_by_range(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    session = next(db.get_session())
+    try:
+        base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        upsert_open_connection_event(session, at=base, reason="disconnected")
+        close_open_connection_event(session, end_time=base + timedelta(minutes=1))
+
+        upsert_open_connection_event(session, at=base + timedelta(days=2), reason="high_packet_loss")
+        close_open_connection_event(session, end_time=base + timedelta(days=2, minutes=1))
+
+        events = get_connection_events(session, start=base + timedelta(days=1), end=base + timedelta(days=3))
+
+        assert len(events) == 1
+        assert events[0].reason == "high_packet_loss"
+    finally:
+        session.close()
+
+
+def test_get_outage_summary_with_no_events(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    session = next(db.get_session())
+    try:
+        summary = get_outage_summary(session)
+
+        assert summary.outages_today == 0
+        assert summary.outages_last_7d == 0
+        assert summary.total_downtime_minutes_last_7d == 0.0
+        assert summary.events == []
+    finally:
+        session.close()
+
+
+def test_get_outage_summary_counts_and_downtime(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    session = next(db.get_session())
+    try:
+        now = datetime.now(timezone.utc)
+
+        # Closed event, started+ended today.
+        upsert_open_connection_event(session, at=now - timedelta(hours=2), reason="disconnected")
+        close_open_connection_event(session, end_time=now - timedelta(hours=2) + timedelta(minutes=5))
+
+        # Closed event from 3 days ago (counts toward the week, not "today").
+        old_start = now - timedelta(days=3)
+        upsert_open_connection_event(session, at=old_start, reason="high_packet_loss")
+        close_open_connection_event(session, end_time=old_start + timedelta(minutes=10))
+
+        summary = get_outage_summary(session, now=now)
+
+        assert summary.outages_today == 1
+        assert summary.outages_last_7d == 2
+        assert summary.total_downtime_minutes_last_7d == pytest.approx(15.0)
+        assert len(summary.events) == 2
+    finally:
+        session.close()
+
+
+def test_get_outage_summary_counts_ongoing_event_downtime(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    session = next(db.get_session())
+    try:
+        now = datetime.now(timezone.utc)
+        upsert_open_connection_event(session, at=now - timedelta(minutes=10), reason="dish_unavailable")
+
+        summary = get_outage_summary(session, now=now)
+
+        assert summary.outages_today == 1
+        assert summary.total_downtime_minutes_last_7d == pytest.approx(10.0, rel=1e-2)
+        assert summary.events[0].end_time is None
     finally:
         session.close()

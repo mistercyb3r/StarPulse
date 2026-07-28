@@ -84,3 +84,23 @@ class TelemetrySample(Base):
     # Dish pointing direction, in degrees.
     azimuth_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
     elevation_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+
+class ConnectionEvent(Base):
+    """A period of degraded connectivity, detected by ``starpulse.collector.outages``.
+
+    At most one row has ``end_time IS NULL`` at a time (the currently
+    open/ongoing event, if the connection is degraded right now).
+    """
+
+    __tablename__ = "connection_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    # Null while the event is still ongoing.
+    end_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # One of: "disconnected", "high_packet_loss", "dish_unavailable".
+    reason: Mapped[str] = mapped_column(String(32), nullable=False)

@@ -3,7 +3,9 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+from starpulse.collector.outages import OutageTracker
 from starpulse.collector.poller import StarlinkPoller
+from starpulse.collector.repository import get_open_connection_event
 from starpulse.db.session import Database
 
 from tests.collector.factories import FakeStarlinkClient, make_sample
@@ -124,3 +126,105 @@ def test_reconfigure_while_running_restarts_with_new_client(tmp_path: Path) -> N
 
     poller.stop(timeout=2)
     assert new_client.fetch_calls >= 1
+
+
+def test_poll_once_opens_outage_event_on_disconnect(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    client = FakeStarlinkClient(samples=[make_sample(connection_state="SEARCHING")])
+    tracker = OutageTracker(db)
+    poller = StarlinkPoller(client, db, interval_seconds=999, outage_tracker=tracker)
+
+    poller.poll_once()
+
+    session = next(db.get_session())
+    try:
+        open_event = get_open_connection_event(session)
+        assert open_event is not None
+        assert open_event.reason == "disconnected"
+    finally:
+        session.close()
+
+
+def test_poll_once_closes_outage_event_on_recovery(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    client = FakeStarlinkClient(
+        samples=[make_sample(connection_state="SEARCHING"), make_sample(connection_state="CONNECTED")]
+    )
+    tracker = OutageTracker(db)
+    poller = StarlinkPoller(client, db, interval_seconds=999, outage_tracker=tracker)
+
+    poller.poll_once()
+    poller.poll_once()
+
+    session = next(db.get_session())
+    try:
+        assert get_open_connection_event(session) is None
+    finally:
+        session.close()
+
+
+def test_poll_once_opens_outage_event_when_dish_unavailable(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    client = FakeStarlinkClient(samples=[])
+    tracker = OutageTracker(db)
+    poller = StarlinkPoller(client, db, interval_seconds=999, outage_tracker=tracker)
+
+    poller.poll_once()
+
+    session = next(db.get_session())
+    try:
+        open_event = get_open_connection_event(session)
+        assert open_event is not None
+        assert open_event.reason == "dish_unavailable"
+    finally:
+        session.close()
+
+
+def test_poll_once_without_outage_tracker_still_works(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    client = FakeStarlinkClient(samples=[make_sample()])
+    poller = StarlinkPoller(client, db, interval_seconds=999)
+
+    row = poller.poll_once()
+
+    assert row is not None
+
+
+def test_poll_once_fetches_dish_location_once(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    client = FakeStarlinkClient(samples=[make_sample(), make_sample()], location=(51.5, -0.1))
+    poller = StarlinkPoller(client, db, interval_seconds=999)
+
+    assert poller.dish_location is None
+
+    poller.poll_once()
+    assert poller.dish_location == (51.5, -0.1)
+    assert client.location_calls == 1
+
+    poller.poll_once()
+    # Only checked once per poller lifetime, not on every successful poll.
+    assert client.location_calls == 1
+
+
+def test_poll_once_tolerates_client_without_fetch_location(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+
+    class MinimalClient:
+        def fetch_sample(self):
+            return make_sample()
+
+        def close(self) -> None:
+            pass
+
+    poller = StarlinkPoller(MinimalClient(), db, interval_seconds=999)
+
+    row = poller.poll_once()
+
+    assert row is not None
+    assert poller.dish_location is None

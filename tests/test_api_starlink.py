@@ -6,7 +6,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from starpulse.collector.repository import save_sample
+from starpulse.collector.repository import close_open_connection_event, save_sample, upsert_open_connection_event
 from starpulse.db.session import Database
 
 from tests.collector.factories import make_sample
@@ -17,6 +17,16 @@ def _insert_sample(app: FastAPI, **overrides):
     session = next(database.get_session())
     try:
         return save_sample(session, make_sample(**overrides))
+    finally:
+        session.close()
+
+
+def _insert_closed_event(app: FastAPI, start: datetime, end: datetime, reason: str = "disconnected"):
+    database: Database = app.state.db
+    session = next(database.get_session())
+    try:
+        upsert_open_connection_event(session, at=start, reason=reason)
+        return close_open_connection_event(session, end_time=end)
     finally:
         session.close()
 
@@ -113,6 +123,11 @@ def test_summary_with_no_samples(client: TestClient) -> None:
     assert body["uptime_percent"] is None
     assert body["peak_download_bps"] is None
     assert body["peak_upload_bps"] is None
+    assert body["best_latency_ms"] is None
+    assert body["worst_latency_ms"] is None
+    assert body["average_power_watts"] is None
+    assert body["min_power_watts"] is None
+    assert body["max_power_watts"] is None
 
 
 def test_summary_computes_averages_and_uptime(app: FastAPI, client: TestClient) -> None:
@@ -189,6 +204,22 @@ def test_summary_includes_peak_values(app: FastAPI, client: TestClient) -> None:
     body = response.json()
     assert body["peak_download_bps"] == pytest.approx(500.0)
     assert body["peak_upload_bps"] == pytest.approx(50.0)
+
+
+def test_summary_includes_latency_and_power_stats(app: FastAPI, client: TestClient) -> None:
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    _insert_sample(app, timestamp=base, latency_ms=20.0, power_watts=30.0)
+    _insert_sample(app, timestamp=base + timedelta(hours=1), latency_ms=80.0, power_watts=50.0)
+
+    response = client.get("/api/starlink/summary")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["best_latency_ms"] == pytest.approx(20.0)
+    assert body["worst_latency_ms"] == pytest.approx(80.0)
+    assert body["average_power_watts"] == pytest.approx(40.0)
+    assert body["min_power_watts"] == pytest.approx(30.0)
+    assert body["max_power_watts"] == pytest.approx(50.0)
 
 
 def test_summary_period_shorthand_overrides_start(app: FastAPI, client: TestClient) -> None:
@@ -270,3 +301,44 @@ def test_dish_info_returns_latest_sample_fields(app: FastAPI, client: TestClient
     assert body["azimuth_deg"] == pytest.approx(180.0)
     assert body["elevation_deg"] == pytest.approx(65.0)
     assert "last_updated" in body
+
+
+def test_outages_with_no_events(client: TestClient) -> None:
+    response = client.get("/api/starlink/outages")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["outages_today"] == 0
+    assert body["outages_last_7d"] == 0
+    assert body["total_downtime_minutes_last_7d"] == 0.0
+    assert body["events"] == []
+
+
+def test_outages_returns_summary_and_events(app: FastAPI, client: TestClient) -> None:
+    now = datetime.now(timezone.utc)
+    _insert_closed_event(app, start=now - timedelta(minutes=30), end=now - timedelta(minutes=25), reason="disconnected")
+
+    response = client.get("/api/starlink/outages")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["outages_today"] == 1
+    assert body["outages_last_7d"] == 1
+    assert body["total_downtime_minutes_last_7d"] == pytest.approx(5.0)
+    assert len(body["events"]) == 1
+    assert body["events"][0]["reason"] == "disconnected"
+    assert body["events"][0]["duration_seconds"] == pytest.approx(300.0)
+
+
+def test_outages_excludes_events_older_than_7_days(app: FastAPI, client: TestClient) -> None:
+    now = datetime.now(timezone.utc)
+    _insert_closed_event(
+        app, start=now - timedelta(days=10), end=now - timedelta(days=10) + timedelta(minutes=5), reason="disconnected"
+    )
+
+    response = client.get("/api/starlink/outages")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["outages_last_7d"] == 0
+    assert body["events"] == []

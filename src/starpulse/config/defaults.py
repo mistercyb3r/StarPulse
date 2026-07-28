@@ -30,6 +30,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "dish_port": 9200,
         "poll_interval_seconds": 5.0,
     },
+    "weather": {
+        "enabled": True,
+        "latitude": "",
+        "longitude": "",
+        "cache_seconds": 600.0,
+    },
 }
 
 DEFAULT_CONFIG_TOML = """\
@@ -66,4 +72,17 @@ dish_port = 9200
 # How often (in seconds) to poll the dish for telemetry. Lower values
 # give more granular data at the cost of slightly more load on the dish.
 poll_interval_seconds = 5.0
+
+[weather]
+# Shows current weather on the dashboard (via the free Open-Meteo API,
+# no API key required).
+enabled = true
+# Leave blank to use the dish's own GPS position when available (this
+# needs location sharing enabled on the dish, and may not be authorized
+# on every install). Otherwise, set your coordinates explicitly, e.g.
+# latitude = "51.5074", longitude = "-0.1278" for London.
+latitude = ""
+longitude = ""
+# How long (in seconds) to cache weather API responses before refreshing.
+cache_seconds = 600
 """

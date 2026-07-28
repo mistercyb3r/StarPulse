@@ -12,7 +12,7 @@ import tomllib
 from pathlib import Path
 from typing import Any, Mapping
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from starpulse.config.defaults import DEFAULT_CONFIG, DEFAULT_CONFIG_TOML
 from starpulse.core.paths import get_config_file_path, get_data_dir
@@ -27,6 +27,9 @@ _ENV_OVERRIDES: dict[str, tuple[str, str]] = {
     "STARPULSE_DISH_HOST": ("starlink", "dish_host"),
     "STARPULSE_DISH_PORT": ("starlink", "dish_port"),
     "STARPULSE_POLL_INTERVAL_SECONDS": ("starlink", "poll_interval_seconds"),
+    "STARPULSE_WEATHER_ENABLED": ("weather", "enabled"),
+    "STARPULSE_WEATHER_LATITUDE": ("weather", "latitude"),
+    "STARPULSE_WEATHER_LONGITUDE": ("weather", "longitude"),
 }
 
 
@@ -50,6 +53,23 @@ class StarlinkSettings(BaseModel):
     poll_interval_seconds: float = 5.0
 
 
+class WeatherSettings(BaseModel):
+    enabled: bool = True
+    # None (from a blank "" in config.toml) means "no fixed location
+    # configured" — the weather endpoint then falls back to the dish's own
+    # GPS position, if the dish has location sharing enabled.
+    latitude: float | None = None
+    longitude: float | None = None
+    cache_seconds: float = 600.0
+
+    @field_validator("latitude", "longitude", mode="before")
+    @classmethod
+    def _blank_string_to_none(cls, value: Any) -> Any:
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
+
+
 class Settings(BaseModel):
     """Fully resolved StarPulse configuration."""
 
@@ -59,6 +79,7 @@ class Settings(BaseModel):
     logging: LoggingSettings = LoggingSettings()
     database: DatabaseSettings = DatabaseSettings()
     starlink: StarlinkSettings = StarlinkSettings()
+    weather: WeatherSettings = WeatherSettings()
 
 
 def _deep_merge(base: dict[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
@@ -137,4 +158,5 @@ def load_settings(
         logging=LoggingSettings(**merged["logging"]),
         database=DatabaseSettings(**merged["database"]),
         starlink=StarlinkSettings(**merged["starlink"]),
+        weather=WeatherSettings(**merged.get("weather", {})),
     )

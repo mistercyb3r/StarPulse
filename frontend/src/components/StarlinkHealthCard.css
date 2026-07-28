@@ -120,3 +120,20 @@
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
+
+@media (max-width: 480px) {
+  .health-card {
+    flex-direction: column;
+    text-align: center;
+    padding: 1.25rem;
+  }
+
+  .health-card__heading {
+    justify-content: center;
+  }
+
+  .health-card__body {
+    min-width: 0;
+    width: 100%;
+  }
+}

@@ -97,6 +97,40 @@ def test_fetch_sample_tolerates_power_fetch_failure(monkeypatch: pytest.MonkeyPa
     assert sample.power_watts is None
 
 
+def test_fetch_location_returns_coordinates(monkeypatch: pytest.MonkeyPatch) -> None:
+    def location_data_ok(context=None):
+        return {"latitude": 51.5074, "longitude": -0.1278, "altitude": 35.0}
+
+    monkeypatch.setattr(starlink_grpc, "location_data", location_data_ok)
+
+    client = GrpcStarlinkClient(host="dish.example", port=9200)
+    location = client.fetch_location()
+
+    assert location == (51.5074, -0.1278)
+
+
+def test_fetch_location_returns_none_when_not_authorized(monkeypatch: pytest.MonkeyPatch) -> None:
+    def location_data_denied(context=None):
+        return {"latitude": None, "longitude": None, "altitude": None}
+
+    monkeypatch.setattr(starlink_grpc, "location_data", location_data_denied)
+
+    client = GrpcStarlinkClient(host="dish.example", port=9200)
+
+    assert client.fetch_location() is None
+
+
+def test_fetch_location_returns_none_on_transport_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    def raise_grpc_error(context=None):
+        raise starlink_grpc.GrpcError("unreachable")
+
+    monkeypatch.setattr(starlink_grpc, "location_data", raise_grpc_error)
+
+    client = GrpcStarlinkClient(host="dish.example", port=9200)
+
+    assert client.fetch_location() is None
+
+
 def test_close_closes_underlying_channel_context() -> None:
     closed = {"value": False}
 

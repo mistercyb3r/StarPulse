@@ -44,6 +44,11 @@ export interface StarlinkSummaryResponse {
   average_obstruction_percent: number | null;
   peak_download_bps: number | null;
   peak_upload_bps: number | null;
+  best_latency_ms: number | null;
+  worst_latency_ms: number | null;
+  average_power_watts: number | null;
+  min_power_watts: number | null;
+  max_power_watts: number | null;
   range_start: string | null;
   range_end: string | null;
 }
@@ -71,6 +76,39 @@ export interface DishInfoResponse {
   azimuth_deg: number | null;
   elevation_deg: number | null;
   last_updated: string;
+}
+
+export type OutageReason = "disconnected" | "high_packet_loss" | "dish_unavailable" | string;
+
+export interface ConnectionEventResponse {
+  id: number;
+  start_time: string;
+  end_time: string | null;
+  duration_seconds: number | null;
+  reason: OutageReason;
+}
+
+export interface OutageSummaryResponse {
+  outages_today: number;
+  outages_last_7d: number;
+  total_downtime_minutes_last_7d: number;
+  events: ConnectionEventResponse[];
+}
+
+export type WeatherLocationSource = "dish_gps" | "configured" | null;
+
+export interface WeatherResponse {
+  available: boolean;
+  temperature_c: number | null;
+  feels_like_c: number | null;
+  humidity_percent: number | null;
+  wind_speed_kph: number | null;
+  conditions: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  location_source: WeatherLocationSource;
+  fetched_at: string | null;
+  message: string | null;
 }
 
 export interface HealthResponse {

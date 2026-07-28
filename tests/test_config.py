@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from starpulse.config.settings import load_settings
 
 
@@ -17,6 +19,10 @@ def test_loading_creates_default_config_file(data_dir: Path) -> None:
     assert settings.starlink.dish_host == "192.168.100.1"
     assert settings.starlink.dish_port == 9200
     assert settings.starlink.poll_interval_seconds == 5.0
+    assert settings.weather.enabled is True
+    assert settings.weather.latitude is None
+    assert settings.weather.longitude is None
+    assert settings.weather.cache_seconds == 600.0
 
 
 def test_loading_is_idempotent(data_dir: Path) -> None:
@@ -75,6 +81,31 @@ def test_env_vars_override_config_file(data_dir: Path) -> None:
     assert isinstance(settings.starlink.dish_port, int)
     assert settings.starlink.poll_interval_seconds == 2.5
     assert isinstance(settings.starlink.poll_interval_seconds, float)
+
+
+def test_weather_env_vars_override_config_file(data_dir: Path) -> None:
+    env = {
+        "STARPULSE_WEATHER_ENABLED": "false",
+        "STARPULSE_WEATHER_LATITUDE": "51.5074",
+        "STARPULSE_WEATHER_LONGITUDE": "-0.1278",
+    }
+
+    settings = load_settings(data_dir=data_dir, env=env)
+
+    assert settings.weather.enabled is False
+    assert settings.weather.latitude == pytest.approx(51.5074)
+    assert settings.weather.longitude == pytest.approx(-0.1278)
+
+
+def test_weather_blank_coordinates_default_to_none(data_dir: Path) -> None:
+    data_dir.mkdir(parents=True)
+    config_file = data_dir / "config.toml"
+    config_file.write_text('[weather]\nlatitude = ""\nlongitude = ""\n', encoding="utf-8")
+
+    settings = load_settings(data_dir=data_dir, env={})
+
+    assert settings.weather.latitude is None
+    assert settings.weather.longitude is None
 
 
 def test_explicit_config_file_override(tmp_path: Path, data_dir: Path) -> None:

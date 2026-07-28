@@ -3,7 +3,7 @@ import { formatBps } from "../utils/format";
 import { MetricCard } from "./MetricCard";
 import "./PerformanceStats.css";
 
-const PERIOD_LABELS: Record<SummaryPeriod, string> = {
+export const PERIOD_LABELS: Record<SummaryPeriod, string> = {
   "24h": "24 Hours",
   "7d": "7 Days",
   "30d": "30 Days",

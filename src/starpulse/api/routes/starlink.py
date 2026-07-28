@@ -15,7 +15,9 @@ from sqlalchemy.orm import Session
 
 from starpulse.api.deps import get_db
 from starpulse.api.schemas import (
+    ConnectionEventResponse,
     DishInfoResponse,
+    OutageSummaryResponse,
     StarlinkHealthResponse,
     StarlinkHistoryResponse,
     StarlinkSummaryResponse,
@@ -84,6 +86,11 @@ def get_summary(
         average_obstruction_percent=stats.average_obstruction_percent,
         peak_download_bps=stats.peak_download_bps,
         peak_upload_bps=stats.peak_upload_bps,
+        best_latency_ms=stats.best_latency_ms,
+        worst_latency_ms=stats.worst_latency_ms,
+        average_power_watts=stats.average_power_watts,
+        min_power_watts=stats.min_power_watts,
+        max_power_watts=stats.max_power_watts,
         range_start=start,
         range_end=end,
     )
@@ -121,3 +128,19 @@ def get_dish_info(db: Session = Depends(get_db)) -> DishInfoResponse:
     if sample is None:
         raise HTTPException(status_code=404, detail="No telemetry samples recorded yet")
     return DishInfoResponse.model_validate(sample)
+
+
+@router.get("/outages", response_model=OutageSummaryResponse)
+def get_outages(db: Session = Depends(get_db)) -> OutageSummaryResponse:
+    """Return outage/degraded-connection counts, downtime, and recent events for a timeline.
+
+    Counts and events cover the last 7 days; ``outages_today`` is the
+    subset of those that started today (server-local UTC day).
+    """
+    summary = repository.get_outage_summary(db)
+    return OutageSummaryResponse(
+        outages_today=summary.outages_today,
+        outages_last_7d=summary.outages_last_7d,
+        total_downtime_minutes_last_7d=summary.total_downtime_minutes_last_7d,
+        events=[ConnectionEventResponse.model_validate(event) for event in summary.events],
+    )

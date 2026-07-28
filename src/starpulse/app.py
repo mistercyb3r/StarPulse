@@ -11,11 +11,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from starpulse import __version__
 from starpulse.api.router import api_router
 from starpulse.collector.client import GrpcStarlinkClient, StarlinkClient
+from starpulse.collector.outages import OutageTracker
 from starpulse.collector.poller import StarlinkPoller
 from starpulse.config.settings import Settings, load_settings
 from starpulse.core.paths import resolve_db_path
 from starpulse.db.session import Database
 from starpulse.logging_config import configure_logging, get_logger
+from starpulse.services.weather import CachedWeatherProvider, OpenMeteoWeatherClient, WeatherClient
 
 StarlinkClientFactory = Callable[[str, int], StarlinkClient]
 
@@ -27,6 +29,7 @@ def create_app(
     *,
     starlink_client: StarlinkClient | None = None,
     start_collector: bool = True,
+    weather_client: WeatherClient | None = None,
 ) -> FastAPI:
     """Build and return a configured FastAPI application.
 
@@ -35,7 +38,8 @@ def create_app(
     ``starlink_client`` lets callers (mainly tests) inject a fake client
     instead of connecting to a real dish; ``start_collector=False`` skips
     starting the background poller entirely, e.g. for tests that only
-    care about the HTTP API.
+    care about the HTTP API. ``weather_client`` similarly lets tests
+    inject a fake instead of making real requests to Open-Meteo.
     """
     settings = settings or load_settings()
     configure_logging(level=settings.logging.level, log_file=settings.logging.file or None)
@@ -54,7 +58,13 @@ def create_app(
         (lambda _host, _port: starlink_client) if starlink_client is not None else GrpcStarlinkClient
     )
     client = client_factory(settings.starlink.dish_host, settings.starlink.dish_port)
-    collector = StarlinkPoller(client, database, settings.starlink.poll_interval_seconds)
+    outage_tracker = OutageTracker(database)
+    collector = StarlinkPoller(
+        client,
+        database,
+        settings.starlink.poll_interval_seconds,
+        outage_tracker=outage_tracker,
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -78,6 +88,10 @@ def create_app(
     app.state.db = database
     app.state.collector = collector
     app.state.starlink_client_factory = client_factory
+    app.state.weather_provider = CachedWeatherProvider(
+        weather_client or OpenMeteoWeatherClient(),
+        cache_seconds=settings.weather.cache_seconds,
+    )
     # The port actually bound by the running server process, captured
     # before any setup-wizard update mutates settings.server.port — used
     # to tell the caller whether a restart is needed for a port change.

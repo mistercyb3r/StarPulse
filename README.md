@@ -11,8 +11,9 @@ file (or a first-run setup page), and designed to be extended with
 plugins/modules over time.
 
 > **Status:** backend + Starlink collector + read API + web dashboard +
-> first-run setup + Docker packaging. See [Roadmap](#roadmap) for what's
-> still missing (auth, retention policies, write/control endpoints).
+> power/latency/weather/outage insights + installable PWA + first-run
+> setup + Docker packaging. See [Roadmap](#roadmap) for what's still
+> missing (auth, retention policies, write/control endpoints).
 
 ## Screenshots
 
@@ -39,7 +40,8 @@ plugins/modules over time.
   service that happens to be started/stopped by the web app's lifespan.
 - **Boring, explicit dependencies.** Only what's needed: FastAPI for the
   API, SQLAlchemy for the database, Pydantic for validated settings,
-  `tomli-w` to persist setup-wizard changes back to `config.toml`, and
+  `tomli-w` to persist setup-wizard changes back to `config.toml`,
+  `httpx` for the (optional, key-free) Open-Meteo weather lookup, and
   `starlink-grpc-core` (the packaged core of
   [sparky8512/starlink-grpc-tools](https://github.com/sparky8512/starlink-grpc-tools))
   for talking to the dish.
@@ -65,8 +67,11 @@ StarPulse/
 │   │   └── session.py         # Database class (init + session lifecycle)
 │   ├── collector/              # Starlink telemetry collection (no FastAPI dependency)
 │   │   ├── client.py           # StarlinkClient protocol + gRPC implementation
-│   │   ├── repository.py       # Persistence/query helpers for TelemetrySample
+│   │   ├── repository.py       # Persistence/query helpers for TelemetrySample + ConnectionEvent
+│   │   ├── outages.py          # Degraded-connection classification (disconnected/high loss/dish down)
 │   │   └── poller.py           # Background thread that polls on an interval
+│   ├── services/
+│   │   └── weather.py          # Open-Meteo client + TTL cache (independent of the collector)
 │   └── api/
 │       ├── router.py          # Aggregates feature routers under /api
 │       ├── deps.py            # Shared FastAPI dependencies
@@ -74,16 +79,21 @@ StarPulse/
 │       └── routes/
 │           ├── health.py      # GET /api/health
 │           ├── setup.py       # GET/POST /api/setup (first-run wizard)
-│           └── starlink.py    # GET /api/starlink/{status,history,summary,health,dish-info}
+│           ├── starlink.py    # GET /api/starlink/{status,history,summary,health,dish-info,outages}
+│           └── weather.py     # GET /api/weather
 ├── tests/                     # pytest suite mirroring the package layout
-│   └── collector/              # Collector tests, using mocked dish responses
+│   ├── collector/              # Collector tests, using mocked dish responses
+│   └── services/                # Weather client/cache tests
 ├── frontend/                  # React + TypeScript dashboard (separate app, see below)
+│   ├── public/
+│   │   ├── icons/               # PWA app icons (192/512/maskable)
+│   │   └── favicon.ico
 │   ├── src/
 │   │   ├── api/                # Fetch client, types mirroring the Pydantic schemas, mock data
-│   │   ├── hooks/               # useStarlinkTelemetry (polling + mock fallback)
-│   │   ├── components/          # Dashboard, SetupWizard, MetricCard, charts/
+│   │   ├── hooks/               # useStarlinkTelemetry (polling + mock fallback), usePwaInstallPrompt
+│   │   ├── components/          # Dashboard, SetupWizard, MetricCard, InfoCard, charts/
 │   │   └── utils/format.ts     # Number/duration/time formatting helpers
-│   ├── vite.config.ts          # Dev server + /api proxy to the backend
+│   ├── vite.config.ts          # Dev server + /api proxy + vite-plugin-pwa (manifest/service worker)
 │   ├── Dockerfile              # Multi-stage build -> nginx (serves the SPA, proxies /api)
 │   ├── nginx.conf
 │   └── package.json

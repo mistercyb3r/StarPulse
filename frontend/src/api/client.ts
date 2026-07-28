@@ -1,6 +1,7 @@
 import type {
   DishInfoResponse,
   HealthResponse,
+  OutageSummaryResponse,
   SetupRequest,
   SetupResponse,
   SetupStatusResponse,
@@ -9,6 +10,7 @@ import type {
   StarlinkSummaryResponse,
   SummaryPeriod,
   TelemetrySample,
+  WeatherResponse,
 } from "./types";
 
 // Empty string = relative paths, which work with the Vite dev proxy
@@ -151,4 +153,12 @@ export function getStarlinkHealth(params: HealthParams = {}): Promise<StarlinkHe
 
 export function getDishInfo(): Promise<DishInfoResponse> {
   return getJson<DishInfoResponse>("/api/starlink/dish-info");
+}
+
+export function getOutages(): Promise<OutageSummaryResponse> {
+  return getJson<OutageSummaryResponse>("/api/starlink/outages");
+}
+
+export function getWeather(): Promise<WeatherResponse> {
+  return getJson<WeatherResponse>("/api/weather");
 }

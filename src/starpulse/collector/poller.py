@@ -13,7 +13,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
-from starpulse.collector.client import StarlinkClient, StarlinkUnavailableError
+from starpulse.collector.client import DishCoordinates, StarlinkClient, StarlinkUnavailableError
 from starpulse.collector.outages import OutageTracker
 from starpulse.collector.repository import save_sample
 from starpulse.db.models import TelemetrySample
@@ -46,7 +46,7 @@ class StarlinkPoller:
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._last_poll_ok: Optional[bool] = None
-        self._dish_location: Optional[tuple[float, float]] = None
+        self._dish_location: Optional[DishCoordinates] = None
 
     @property
     def is_running(self) -> bool:
@@ -62,8 +62,8 @@ class StarlinkPoller:
         return self._last_poll_ok
 
     @property
-    def dish_location(self) -> Optional[tuple[float, float]]:
-        """The latest dish GPS (latitude, longitude) known to this poller.
+    def dish_location(self) -> Optional[DishCoordinates]:
+        """The latest dish GPS coordinates known to this poller.
 
         Updated on every successful poll when the dish authorizes location
         sharing. Keeps the last good reading across transient failures so
@@ -149,10 +149,15 @@ class StarlinkPoller:
             self._dish_location = fetched
         if self._dish_location is None:
             return sample
-        latitude, longitude = self._dish_location
-        return replace(sample, latitude=latitude, longitude=longitude)
+        coords = self._dish_location
+        return replace(
+            sample,
+            latitude=coords.latitude,
+            longitude=coords.longitude,
+            altitude_m=coords.altitude_m,
+        )
 
-    def _safe_fetch_location(self) -> Optional[tuple[float, float]]:
+    def _safe_fetch_location(self) -> Optional[DishCoordinates]:
         """Best-effort fetch of the dish's GPS position.
 
         Not every ``StarlinkClient`` implements ``fetch_location`` (it's

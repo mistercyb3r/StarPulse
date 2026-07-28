@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getDishInfo,
   getHealth,
+  getLocation,
   getOutages,
   getStarlinkHealth,
   getStarlinkHistory,
@@ -14,6 +15,7 @@ import {
   generateMockDishInfo,
   generateMockHealth,
   generateMockHistoryResponse,
+  generateMockLocation,
   generateMockOutageSummary,
   generateMockStarlinkHealth,
   generateMockStatus,
@@ -24,6 +26,7 @@ import {
 import type {
   DishInfoResponse,
   HealthResponse,
+  LocationResponse,
   OutageSummaryResponse,
   StarlinkHealthResponse,
   StarlinkHistoryResponse,
@@ -49,6 +52,7 @@ export interface StarlinkTelemetryState {
   setPerformancePeriod: (period: SummaryPeriod) => void;
   weather: WeatherResponse | null;
   weatherImpact: WeatherImpactResponse | null;
+  location: LocationResponse | null;
   outages: OutageSummaryResponse | null;
   isLoading: boolean;
   isUsingMockData: boolean;
@@ -66,6 +70,7 @@ export function useStarlinkTelemetry(pollIntervalMs: number = DEFAULT_POLL_INTER
     performance: null,
     weather: null,
     weatherImpact: null,
+    location: null,
     outages: null,
     isLoading: true,
     isUsingMockData: false,
@@ -76,7 +81,7 @@ export function useStarlinkTelemetry(pollIntervalMs: number = DEFAULT_POLL_INTER
 
   const refresh = useCallback(async () => {
     try {
-      const [status, history, health, starlinkHealth, dishInfo, performance, weather, weatherImpact, outages] =
+      const [status, history, health, starlinkHealth, dishInfo, performance, weather, weatherImpact, location, outages] =
         await Promise.all([
           getStarlinkStatus(),
           getStarlinkHistory({ limit: HISTORY_LIMIT }),
@@ -86,6 +91,7 @@ export function useStarlinkTelemetry(pollIntervalMs: number = DEFAULT_POLL_INTER
           getStarlinkSummary({ period: performancePeriod }),
           getWeather(),
           getWeatherImpact(),
+          getLocation(),
           getOutages(),
         ]);
 
@@ -99,6 +105,7 @@ export function useStarlinkTelemetry(pollIntervalMs: number = DEFAULT_POLL_INTER
         performance,
         weather,
         weatherImpact,
+        location,
         outages,
         isLoading: false,
         isUsingMockData: false,
@@ -115,6 +122,7 @@ export function useStarlinkTelemetry(pollIntervalMs: number = DEFAULT_POLL_INTER
         performance: generateMockSummary(performancePeriod),
         weather: generateMockWeather(),
         weatherImpact: generateMockWeatherImpact(),
+        location: generateMockLocation(),
         outages: generateMockOutageSummary(),
         isLoading: false,
         isUsingMockData: true,

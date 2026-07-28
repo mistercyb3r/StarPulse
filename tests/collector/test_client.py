@@ -106,7 +106,10 @@ def test_fetch_location_returns_coordinates(monkeypatch: pytest.MonkeyPatch) -> 
     client = GrpcStarlinkClient(host="dish.example", port=9200)
     location = client.fetch_location()
 
-    assert location == (51.5074, -0.1278)
+    assert location is not None
+    assert location.latitude == pytest.approx(51.5074)
+    assert location.longitude == pytest.approx(-0.1278)
+    assert location.altitude_m == pytest.approx(35.0)
 
 
 def test_fetch_location_returns_none_when_not_authorized(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -205,7 +205,9 @@ def test_poll_once_stores_and_refreshes_dish_location(tmp_path: Path) -> None:
     assert poller.dish_location is None
 
     row = poller.poll_once()
-    assert poller.dish_location == (51.5, -0.1)
+    assert poller.dish_location is not None
+    assert poller.dish_location.latitude == pytest.approx(51.5)
+    assert poller.dish_location.longitude == pytest.approx(-0.1)
     assert client.location_calls == 1
     assert row is not None
     assert row.latitude == pytest.approx(51.5)
@@ -214,7 +216,8 @@ def test_poll_once_stores_and_refreshes_dish_location(tmp_path: Path) -> None:
     poller.poll_once()
     # Location is refreshed on every successful poll so telemetry stays current.
     assert client.location_calls == 2
-    assert poller.dish_location == (51.5, -0.1)
+    assert poller.dish_location.latitude == pytest.approx(51.5)
+    assert poller.dish_location.longitude == pytest.approx(-0.1)
 
 
 def test_poll_once_keeps_last_known_location_when_refresh_fails(tmp_path: Path) -> None:
@@ -227,7 +230,9 @@ def test_poll_once_keeps_last_known_location_when_refresh_fails(tmp_path: Path) 
     client._location = None
     row = poller.poll_once()
 
-    assert poller.dish_location == (51.5, -0.1)
+    assert poller.dish_location is not None
+    assert poller.dish_location.latitude == pytest.approx(51.5)
+    assert poller.dish_location.longitude == pytest.approx(-0.1)
     assert row is not None
     assert row.latitude == pytest.approx(51.5)
     assert row.longitude == pytest.approx(-0.1)

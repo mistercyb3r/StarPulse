@@ -1,6 +1,7 @@
 import type {
   DishInfoResponse,
   HealthResponse,
+  LocationResponse,
   OutageSummaryResponse,
   SetupRequest,
   SetupResponse,
@@ -164,6 +165,10 @@ export function getOutages(): Promise<OutageSummaryResponse> {
 
 export function getWeather(): Promise<WeatherResponse> {
   return getJson<WeatherResponse>("/api/weather");
+}
+
+export function getLocation(): Promise<LocationResponse> {
+  return getJson<LocationResponse>("/api/location");
 }
 
 export function getWeatherImpact(): Promise<WeatherImpactResponse> {

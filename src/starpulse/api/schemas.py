@@ -36,6 +36,7 @@ class TelemetrySampleResponse(BaseModel):
     gps_satellites: int | None
     latitude: float | None
     longitude: float | None
+    altitude_m: float | None = None
     azimuth_deg: float | None
     elevation_deg: float | None
 
@@ -134,6 +135,28 @@ class OutageSummaryResponse(BaseModel):
     outages_last_7d: int
     total_downtime_minutes_last_7d: float
     events: list[ConnectionEventResponse]
+
+
+class LocationResponse(BaseModel):
+    """Resolved dish/weather location for the dashboard Location card.
+
+    Never invents coordinates. ``place_name`` is optional reverse-geocode
+    labeling only; when reverse geocoding fails, coordinates still return.
+    """
+
+    available: bool
+    latitude: float | None = None
+    longitude: float | None = None
+    altitude_m: float | None = None
+    # One of: "dish_gps", "configured", "stored", or None when unavailable.
+    source: str | None = None
+    source_label: str | None = None
+    place_name: str | None = None
+    gps_valid: bool | None = None
+    gps_enabled: bool | None = None
+    gps_satellites: int | None = None
+    coordinates_collected: bool = False
+    message: str | None = None
 
 
 class WeatherResponse(BaseModel):

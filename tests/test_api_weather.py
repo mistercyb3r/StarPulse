@@ -83,7 +83,7 @@ def test_weather_unavailable_when_disabled(tmp_path: Path) -> None:
 
 
 def test_weather_uses_configured_location(tmp_path: Path) -> None:
-    """Case 1: user-configured weather.latitude/longitude."""
+    """Configured weather.latitude/longitude when dish GPS is unavailable."""
     weather = FakeWeatherClient(_snapshot(latitude=51.5, longitude=-0.1))
     app = _make_app(
         tmp_path,
@@ -102,10 +102,12 @@ def test_weather_uses_configured_location(tmp_path: Path) -> None:
 
 
 def test_weather_uses_dish_gps_when_no_config(tmp_path: Path) -> None:
-    """Case 2: no config → fall back to Starlink dish GPS."""
+    """Dish GPS is the primary location source."""
+    from starpulse.collector.client import DishCoordinates
+
     weather = FakeWeatherClient(_snapshot(latitude=40.0, longitude=10.0))
     app = _make_app(tmp_path, weather)
-    app.state.collector._dish_location = (40.0, 10.0)
+    app.state.collector._dish_location = DishCoordinates(latitude=40.0, longitude=10.0)
 
     with TestClient(app) as client:
         response = client.get("/api/weather")
@@ -118,23 +120,25 @@ def test_weather_uses_dish_gps_when_no_config(tmp_path: Path) -> None:
     assert weather.last_coords == (40.0, 10.0)
 
 
-def test_weather_configured_location_overrides_dish_gps(tmp_path: Path) -> None:
-    """Case 1 beats case 2: explicit config always wins over dish GPS."""
-    weather = FakeWeatherClient(_snapshot(latitude=51.5, longitude=-0.1))
+def test_weather_dish_gps_preferred_over_configured(tmp_path: Path) -> None:
+    """Dish GPS wins over configured weather.latitude/longitude."""
+    from starpulse.collector.client import DishCoordinates
+
+    weather = FakeWeatherClient(_snapshot(latitude=40.0, longitude=10.0))
     app = _make_app(
         tmp_path,
         weather,
         env={"STARPULSE_WEATHER_LATITUDE": "51.5", "STARPULSE_WEATHER_LONGITUDE": "-0.1"},
     )
-    app.state.collector._dish_location = (40.0, 10.0)
+    app.state.collector._dish_location = DishCoordinates(latitude=40.0, longitude=10.0)
 
     with TestClient(app) as client:
         response = client.get("/api/weather")
 
     assert response.status_code == 200
     body = response.json()
-    assert body["location_source"] == "configured"
-    assert weather.last_coords == (51.5, -0.1)
+    assert body["location_source"] == "dish_gps"
+    assert weather.last_coords == (40.0, 10.0)
 
 
 def test_weather_falls_back_to_stored_telemetry_gps(tmp_path: Path) -> None:

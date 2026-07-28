@@ -17,6 +17,7 @@ from starpulse.config.settings import Settings, load_settings
 from starpulse.core.paths import resolve_db_path
 from starpulse.db.session import Database
 from starpulse.logging_config import configure_logging, get_logger
+from starpulse.services.geocoding import BigDataCloudPlaceNameResolver, PlaceNameResolver
 from starpulse.services.weather import CachedWeatherProvider, OpenMeteoWeatherClient, WeatherClient
 from starpulse.services.weather_sampler import WeatherSampler
 
@@ -32,6 +33,7 @@ def create_app(
     start_collector: bool = True,
     start_weather_sampler: bool | None = None,
     weather_client: WeatherClient | None = None,
+    place_resolver: PlaceNameResolver | None = None,
 ) -> FastAPI:
     """Build and return a configured FastAPI application.
 
@@ -42,6 +44,8 @@ def create_app(
     starting the background poller entirely, e.g. for tests that only
     care about the HTTP API. ``weather_client`` similarly lets tests
     inject a fake instead of making real requests to Open-Meteo.
+    ``place_resolver`` injects reverse geocoding (defaults to BigDataCloud;
+    tests can pass ``NullPlaceNameResolver`` to avoid network calls).
     ``start_weather_sampler`` defaults to matching ``start_collector``.
     """
     settings = settings or load_settings()
@@ -76,6 +80,9 @@ def create_app(
         cache_seconds=settings.weather.cache_seconds,
     )
     weather_sampler = WeatherSampler(database, settings, collector, weather_provider)
+    resolved_place_resolver: PlaceNameResolver = (
+        place_resolver if place_resolver is not None else BigDataCloudPlaceNameResolver()
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
@@ -105,6 +112,7 @@ def create_app(
     app.state.starlink_client_factory = client_factory
     app.state.weather_provider = weather_provider
     app.state.weather_sampler = weather_sampler
+    app.state.place_resolver = resolved_place_resolver
     # The port actually bound by the running server process, captured
     # before any setup-wizard update mutates settings.server.port — used
     # to tell the caller whether a restart is needed for a port change.

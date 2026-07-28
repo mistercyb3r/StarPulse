@@ -24,10 +24,11 @@ export interface TelemetrySample {
   gps_valid: boolean | null;
   gps_enabled: boolean | null;
   gps_satellites: number | null;
-    azimuth_deg: number | null;
-    elevation_deg: number | null;
-    latitude: number | null;
-    longitude: number | null;
+  azimuth_deg: number | null;
+  elevation_deg: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  altitude_m?: number | null;
 }
 
 export interface StarlinkHistoryResponse {
@@ -98,6 +99,21 @@ export interface OutageSummaryResponse {
 }
 
 export type WeatherLocationSource = "dish_gps" | "configured" | "stored" | null;
+
+export interface LocationResponse {
+  available: boolean;
+  latitude: number | null;
+  longitude: number | null;
+  altitude_m: number | null;
+  source: WeatherLocationSource;
+  source_label: string | null;
+  place_name: string | null;
+  gps_valid: boolean | null;
+  gps_enabled: boolean | null;
+  gps_satellites: number | null;
+  coordinates_collected: boolean;
+  message: string | null;
+}
 
 export interface WeatherResponse {
   available: boolean;

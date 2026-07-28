@@ -2,6 +2,7 @@ import type {
   ConnectionEventResponse,
   DishInfoResponse,
   HealthResponse,
+  LocationResponse,
   OutageSummaryResponse,
   StarlinkHealthResponse,
   StarlinkHistoryResponse,
@@ -155,8 +156,25 @@ export function generateMockWeather(): WeatherResponse {
     precipitation_probability: 10,
     latitude: 51.5074,
     longitude: -0.1278,
-    location_source: "configured",
+    location_source: "dish_gps",
     fetched_at: new Date().toISOString(),
+    message: null,
+  };
+}
+
+export function generateMockLocation(): LocationResponse {
+  return {
+    available: true,
+    latitude: 51.5074,
+    longitude: -0.1278,
+    altitude_m: 35,
+    source: "dish_gps",
+    source_label: "Starlink GPS",
+    place_name: "London, GB",
+    gps_valid: true,
+    gps_enabled: true,
+    gps_satellites: 14,
+    coordinates_collected: true,
     message: null,
   };
 }

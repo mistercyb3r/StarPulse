@@ -1,6 +1,6 @@
 """Current weather, weather impact, and weather vs performance history.
 
-Location resolution (configured → dish GPS → last stored) lives in
+Location resolution (dish GPS → configured → last stored) lives in
 ``starpulse.services.location``. Weather Impact correlates Open-Meteo
 readings with Starlink telemetry and outage events.
 """
@@ -25,7 +25,7 @@ from starpulse.api.schemas import (
 from starpulse.collector import repository as telemetry_repository
 from starpulse.collector.poller import StarlinkPoller
 from starpulse.config.settings import Settings
-from starpulse.services.location import resolve_weather_location
+from starpulse.services.location import location_unavailable_message, resolve_weather_location
 from starpulse.services.weather import CachedWeatherProvider, WeatherUnavailableError
 from starpulse.services.weather_impact import compute_weather_impact
 from starpulse.services.weather_repository import get_weather_history
@@ -64,7 +64,10 @@ def get_weather(
 
     resolved = resolve_weather_location(settings, collector, db, persist=True)
     if resolved is None:
-        return WeatherResponse(available=False, message="location unavailable")
+        return WeatherResponse(
+            available=False,
+            message=location_unavailable_message(settings, collector, db),
+        )
 
     try:
         snapshot = provider.get_weather(resolved.latitude, resolved.longitude)
@@ -115,7 +118,7 @@ def get_weather_impact(
             available=False,
             severity="Unknown",
             reasons=impact.reasons,
-            message="location unavailable",
+            message=location_unavailable_message(settings, collector, db),
         )
 
     return WeatherImpactResponse(

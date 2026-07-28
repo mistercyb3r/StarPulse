@@ -39,6 +39,19 @@ class StarlinkUnavailableError(Exception):
 
 
 @dataclass(frozen=True)
+class DishCoordinates:
+    """Dish GPS fix from the separate ``get_location`` RPC.
+
+    Distinct from status ``gps_ready`` / ``gps_enabled``: the dish can report
+    a locked GPS while still denying coordinate sharing (PERMISSION_DENIED).
+    """
+
+    latitude: float
+    longitude: float
+    altitude_m: float | None = None
+
+
+@dataclass(frozen=True)
 class StarlinkSample:
     """A normalized snapshot of dish telemetry, independent of the gRPC wire format."""
 
@@ -64,6 +77,7 @@ class StarlinkSample:
     # isn't authorized). Distinct from the pointing azimuth/elevation.
     latitude: float | None
     longitude: float | None
+    altitude_m: float | None
     azimuth_deg: float | None
     elevation_deg: float | None
 
@@ -75,8 +89,8 @@ class StarlinkClient(Protocol):
 
     def close(self) -> None: ...
 
-    def fetch_location(self) -> tuple[float, float] | None:
-        """Return the dish's (latitude, longitude), or ``None`` if unavailable.
+    def fetch_location(self) -> DishCoordinates | None:
+        """Return the dish's GPS coordinates, or ``None`` if unavailable.
 
         Optional: not every implementation needs to provide this — callers
         should use ``getattr(client, "fetch_location", None)`` rather than
@@ -118,12 +132,13 @@ class GrpcStarlinkClient:
         power_samples = bulk.get("power_w") or []
         return power_samples[-1] if power_samples else None
 
-    def fetch_location(self) -> tuple[float, float] | None:
+    def fetch_location(self) -> DishCoordinates | None:
         """Best-effort fetch of the dish's GPS position.
 
         Requires location sharing to be authorized on the dish; returns
         ``None`` (rather than raising) whenever it isn't, since that's a
-        normal, expected outcome, not a failure.
+        normal, expected outcome, not a failure. GPS lock
+        (``gps_ready`` on status) does **not** imply coordinates are shared.
         """
         try:
             location = starlink_grpc.location_data(context=self._context)
@@ -135,7 +150,12 @@ class GrpcStarlinkClient:
         longitude = location.get("longitude")
         if latitude is None or longitude is None:
             return None
-        return latitude, longitude
+        altitude = location.get("altitude")
+        return DishCoordinates(
+            latitude=float(latitude),
+            longitude=float(longitude),
+            altitude_m=float(altitude) if altitude is not None else None,
+        )
 
     def close(self) -> None:
         self._context.close()
@@ -164,6 +184,7 @@ def _sample_from_status(status: dict[str, Any], power_watts: float | None) -> St
         # these in after ``fetch_location`` when available.
         latitude=None,
         longitude=None,
+        altitude_m=None,
         azimuth_deg=status.get("direction_azimuth"),
         elevation_deg=status.get("direction_elevation"),
     )

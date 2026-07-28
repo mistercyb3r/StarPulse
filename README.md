@@ -382,12 +382,24 @@ without bypassing the cache or hammering Open-Meteo.
 
 Weather lookups resolve coordinates in this order (first match wins):
 
-1. User-configured `[weather] latitude` / `longitude` (config, env, or
+1. Starlink dish GPS (live poller cache, then latest telemetry sample)
+2. User-configured `[weather] latitude` / `longitude` (config, env, or
    setup wizard)
-2. Starlink dish GPS (live poller cache, then latest telemetry sample)
 3. Last successfully resolved coordinates stored in `app_meta`
    (`weather_resolved_*`) for continuity after restart
-4. Otherwise the API reports `location unavailable`
+4. Otherwise the API reports that coordinates are not collected yet
+
+**Important:** dish GPS *lock* (`gps_ready` / dashboard “GPS Status:
+Locked”) comes from the status RPC and does **not** imply coordinates
+are available. Coordinates require the separate location-sharing RPC
+(`get_location`). If GPS is locked but sharing is off, StarPulse shows
+`Coordinates: Not collected yet` and will not invent a location — set
+`[weather]` lat/lon in setup/config, or enable location sharing on the
+dish.
+
+`GET /api/location` returns the resolved coordinates (plus optional
+reverse-geocoded place name), GPS lock state, and altitude when the
+dish provides it.
 
 ### Weather Impact severity
 
@@ -526,6 +538,10 @@ What it shows:
 - **Dish Information** — model, software version, dish uptime, GPS
   status, satellite count, and pointing (azimuth/elevation), from
   `/api/starlink/dish-info`.
+- **Location card** — place name (when reverse geocode succeeds), source
+  (Starlink GPS / Configured / Last known), and altitude when available.
+  If GPS is locked but coordinates were not shared by the dish: “GPS:
+  Locked” / “Coordinates: Not collected yet”.
 - **Weather card** — temperature, wind, rain %, conditions from
   `/api/weather`.
 - **Signal Conditions card** — Weather Impact severity (Low / Moderate /
@@ -538,12 +554,12 @@ What it shows:
 It polls `/api/health`, `/api/starlink/status`, `/api/starlink/history`,
 `/api/starlink/health`, `/api/starlink/dish-info`,
 `/api/starlink/summary` (re-fetched whenever the performance period
-changes), `/api/weather`, and `/api/weather/impact` every 5 seconds. If
-any of those requests fail — the backend isn't running, or it's a fresh
-install with no telemetry collected yet — the dashboard falls back to
-generated mock data (all endpoints together, so the numbers stay
-consistent) and shows a banner saying so, rather than an error page or
-blank screen.
+changes), `/api/location`, `/api/weather`, and `/api/weather/impact`
+every 5 seconds. If any of those requests fail — the backend isn't
+running, or it's a fresh install with no telemetry collected yet — the
+dashboard falls back to generated mock data (all endpoints together, so
+the numbers stay consistent) and shows a banner saying so, rather than
+an error page or blank screen.
 
 In development, `vite.config.ts` proxies `/api/*` to
 `http://localhost:8000`, so the browser never makes a cross-origin

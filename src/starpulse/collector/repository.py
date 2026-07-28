@@ -15,7 +15,7 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
-from starpulse.collector.client import StarlinkSample
+from starpulse.collector.client import DishCoordinates, StarlinkSample
 from starpulse.db.models import ConnectionEvent, TelemetrySample
 
 CONNECTED_STATE = "CONNECTED"
@@ -42,6 +42,7 @@ def save_sample(session: Session, sample: StarlinkSample) -> TelemetrySample:
         gps_satellites=sample.gps_satellites,
         latitude=sample.latitude,
         longitude=sample.longitude,
+        altitude_m=sample.altitude_m,
         azimuth_deg=sample.azimuth_deg,
         elevation_deg=sample.elevation_deg,
     )
@@ -57,14 +58,14 @@ def get_latest_sample(session: Session) -> TelemetrySample | None:
     return session.execute(stmt).scalar_one_or_none()
 
 
-def get_latest_dish_location(session: Session) -> tuple[float, float] | None:
+def get_latest_dish_location(session: Session) -> DishCoordinates | None:
     """Return the most recent dish GPS coordinates stored in telemetry, if any.
 
     Used as a weather fallback after restart, before the poller has had a
     chance to refresh ``dish_location`` in memory.
     """
     stmt = (
-        select(TelemetrySample.latitude, TelemetrySample.longitude)
+        select(TelemetrySample.latitude, TelemetrySample.longitude, TelemetrySample.altitude_m)
         .where(TelemetrySample.latitude.is_not(None), TelemetrySample.longitude.is_not(None))
         .order_by(TelemetrySample.timestamp.desc())
         .limit(1)
@@ -72,7 +73,11 @@ def get_latest_dish_location(session: Session) -> tuple[float, float] | None:
     row = session.execute(stmt).one_or_none()
     if row is None:
         return None
-    return float(row.latitude), float(row.longitude)
+    return DishCoordinates(
+        latitude=float(row.latitude),
+        longitude=float(row.longitude),
+        altitude_m=float(row.altitude_m) if row.altitude_m is not None else None,
+    )
 
 
 def get_recent_samples(

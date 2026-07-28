@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from starpulse.collector.client import StarlinkSample, StarlinkUnavailableError
+from starpulse.collector.client import DishCoordinates, StarlinkSample, StarlinkUnavailableError
 
 
 def make_sample(**overrides: Any) -> StarlinkSample:
@@ -32,6 +32,7 @@ def make_sample(**overrides: Any) -> StarlinkSample:
         gps_satellites=12,
         latitude=None,
         longitude=None,
+        altitude_m=None,
         azimuth_deg=180.5,
         elevation_deg=64.2,
     )
@@ -51,11 +52,11 @@ class FakeStarlinkClient:
         self,
         samples: list[StarlinkSample] | None = None,
         error: Exception | None = None,
-        location: tuple[float, float] | None = None,
+        location: DishCoordinates | tuple[float, float] | None = None,
     ) -> None:
         self._samples = list(samples) if samples is not None else []
         self._error = error
-        self._location = location
+        self._location = _coerce_location(location)
         self.closed = False
         self.fetch_calls = 0
         self.location_calls = 0
@@ -68,9 +69,20 @@ class FakeStarlinkClient:
             raise self._error
         raise StarlinkUnavailableError("FakeStarlinkClient has no more samples queued")
 
-    def fetch_location(self) -> tuple[float, float] | None:
+    def fetch_location(self) -> DishCoordinates | None:
         self.location_calls += 1
         return self._location
 
     def close(self) -> None:
         self.closed = True
+
+
+def _coerce_location(
+    location: DishCoordinates | tuple[float, float] | None,
+) -> DishCoordinates | None:
+    if location is None:
+        return None
+    if isinstance(location, DishCoordinates):
+        return location
+    latitude, longitude = location
+    return DishCoordinates(latitude=latitude, longitude=longitude)

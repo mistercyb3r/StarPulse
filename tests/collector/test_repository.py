@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from starpulse.collector.client import DishCoordinates
 from starpulse.collector.repository import (
     close_open_connection_event,
     count_samples,
@@ -65,7 +66,7 @@ def test_get_latest_dish_location_returns_most_recent_coords(tmp_path: Path) -> 
         save_sample(session, make_sample(timestamp=datetime(2026, 1, 2, tzinfo=timezone.utc), latitude=3.0, longitude=4.0))
         save_sample(session, make_sample(timestamp=datetime(2026, 1, 3, tzinfo=timezone.utc), latitude=None, longitude=None))
 
-        assert get_latest_dish_location(session) == (3.0, 4.0)
+        assert get_latest_dish_location(session) == DishCoordinates(latitude=3.0, longitude=4.0)
     finally:
         session.close()
 

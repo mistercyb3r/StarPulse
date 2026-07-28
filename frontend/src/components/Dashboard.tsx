@@ -10,6 +10,7 @@ import { DishInfoCard } from "./DishInfoCard";
 import { InstallPwaButton } from "./InstallPwaButton";
 import { LatencyStatsCard } from "./LatencyStatsCard";
 import { LoadingScreen } from "./LoadingScreen";
+import { LocationCard } from "./LocationCard";
 import { MetricCard, type MetricTone } from "./MetricCard";
 import { MockDataBanner } from "./MockDataBanner";
 import { OutageHistoryCard } from "./OutageHistoryCard";
@@ -43,6 +44,7 @@ export function Dashboard({ onOpenWeatherImpact }: DashboardProps) {
     setPerformancePeriod,
     weather,
     weatherImpact,
+    location,
     outages,
     isLoading,
     isUsingMockData,
@@ -100,6 +102,7 @@ export function Dashboard({ onOpenWeatherImpact }: DashboardProps) {
       <PerformanceStats performance={performance} period={performancePeriod} onPeriodChange={setPerformancePeriod} />
 
       <section className="dashboard__info-grid">
+        <LocationCard location={location} />
         <WeatherCard weather={weather} />
         <SignalConditionsCard impact={weatherImpact} />
         <PowerCard current={status} stats={performance} periodLabel={periodLabel} />

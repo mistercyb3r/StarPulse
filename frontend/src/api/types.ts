@@ -115,6 +115,34 @@ export interface LocationResponse {
   message: string | null;
 }
 
+export interface LocationSettingsResponse {
+  active_source: WeatherLocationSource;
+  active_source_label: string | null;
+  active_latitude: number | null;
+  active_longitude: number | null;
+  place_name: string | null;
+  dish_gps_available: boolean;
+  dish_latitude: number | null;
+  dish_longitude: number | null;
+  manual_latitude: number | null;
+  manual_longitude: number | null;
+  gps_valid: boolean | null;
+  gps_enabled: boolean | null;
+  message: string | null;
+  privacy_note: string;
+}
+
+export interface ManualLocationRequest {
+  latitude: number;
+  longitude: number;
+}
+
+export interface LocationActionResponse {
+  ok: boolean;
+  message: string;
+  settings: LocationSettingsResponse;
+}
+
 export interface WeatherResponse {
   available: boolean;
   temperature_c: number | null;

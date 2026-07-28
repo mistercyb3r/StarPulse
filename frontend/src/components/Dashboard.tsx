@@ -30,9 +30,10 @@ function toneForThreshold(value: number | null | undefined, warnAt: number, badA
 
 interface DashboardProps {
   onOpenWeatherImpact?: () => void;
+  onOpenLocationSettings?: () => void;
 }
 
-export function Dashboard({ onOpenWeatherImpact }: DashboardProps) {
+export function Dashboard({ onOpenWeatherImpact, onOpenLocationSettings }: DashboardProps) {
   const {
     status,
     history,
@@ -72,6 +73,11 @@ export function Dashboard({ onOpenWeatherImpact }: DashboardProps) {
           {onOpenWeatherImpact && (
             <button type="button" className="dashboard__nav-link" onClick={onOpenWeatherImpact}>
               Weather Impact
+            </button>
+          )}
+          {onOpenLocationSettings && (
+            <button type="button" className="dashboard__nav-link" onClick={onOpenLocationSettings}>
+              Location
             </button>
           )}
           <InstallPwaButton />

@@ -159,6 +159,41 @@ class LocationResponse(BaseModel):
     message: str | None = None
 
 
+class LocationSettingsResponse(BaseModel):
+    """Payload for the Location Settings page."""
+
+    active_source: str | None = None
+    active_source_label: str | None = None
+    active_latitude: float | None = None
+    active_longitude: float | None = None
+    place_name: str | None = None
+    dish_gps_available: bool = False
+    dish_latitude: float | None = None
+    dish_longitude: float | None = None
+    manual_latitude: float | None = None
+    manual_longitude: float | None = None
+    gps_valid: bool | None = None
+    gps_enabled: bool | None = None
+    message: str | None = None
+    privacy_note: str
+
+
+class ManualLocationRequest(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
+class LocationTestRequest(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
+class LocationActionResponse(BaseModel):
+    ok: bool
+    message: str
+    settings: LocationSettingsResponse
+
+
 class WeatherResponse(BaseModel):
     """Current weather at the dish's location (dish GPS, or a configured fallback).
 

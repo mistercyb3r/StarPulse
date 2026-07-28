@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { getSetupStatus } from "./api/client";
 import { Dashboard } from "./components/Dashboard";
 import { LoadingScreen } from "./components/LoadingScreen";
+import { LocationSettingsPage } from "./components/LocationSettingsPage";
 import { SetupWizard } from "./components/SetupWizard";
 import { WeatherImpactPage } from "./components/WeatherImpactPage";
 
-type View = "checking" | "setup" | "dashboard" | "weather-impact";
+type View = "checking" | "setup" | "dashboard" | "weather-impact" | "location-settings";
 
 export function App() {
   const [view, setView] = useState<View>("checking");
@@ -40,5 +41,14 @@ export function App() {
     return <WeatherImpactPage onBack={() => setView("dashboard")} />;
   }
 
-  return <Dashboard onOpenWeatherImpact={() => setView("weather-impact")} />;
+  if (view === "location-settings") {
+    return <LocationSettingsPage onBack={() => setView("dashboard")} />;
+  }
+
+  return (
+    <Dashboard
+      onOpenWeatherImpact={() => setView("weather-impact")}
+      onOpenLocationSettings={() => setView("location-settings")}
+    />
+  );
 }

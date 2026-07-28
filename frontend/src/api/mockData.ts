@@ -3,6 +3,7 @@ import type {
   DishInfoResponse,
   HealthResponse,
   LocationResponse,
+  LocationSettingsResponse,
   OutageSummaryResponse,
   StarlinkHealthResponse,
   StarlinkHistoryResponse,
@@ -176,6 +177,26 @@ export function generateMockLocation(): LocationResponse {
     gps_satellites: 14,
     coordinates_collected: true,
     message: null,
+  };
+}
+
+export function generateMockLocationSettings(): LocationSettingsResponse {
+  return {
+    active_source: "dish_gps",
+    active_source_label: "Starlink GPS",
+    active_latitude: 51.5074,
+    active_longitude: -0.1278,
+    place_name: "London, GB",
+    dish_gps_available: true,
+    dish_latitude: 51.5074,
+    dish_longitude: -0.1278,
+    manual_latitude: null,
+    manual_longitude: null,
+    gps_valid: true,
+    gps_enabled: true,
+    message: null,
+    privacy_note:
+      "StarPulse does not require location sharing. Coordinates can be entered manually and remain local.",
   };
 }
 

@@ -1,0 +1,236 @@
+.location-settings {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.location-settings__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.location-settings__back {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0;
+  margin-bottom: 0.55rem;
+  cursor: pointer;
+}
+
+.location-settings__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.location-settings__subtitle {
+  margin: 0.35rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  max-width: 40rem;
+}
+
+.location-settings__banner,
+.location-settings__loading {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.location-settings__banner {
+  padding: 0.75rem 1rem;
+  border-radius: 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
+  background: color-mix(in srgb, var(--warn) 10%, var(--surface));
+  color: var(--warn);
+}
+
+.location-settings__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+
+.location-settings__card {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.9rem;
+  padding: 1.25rem 1.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.location-settings__card-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.location-settings__source {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.location-settings__place,
+.location-settings__coords {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.location-settings__muted,
+.location-settings__hint,
+.location-settings__privacy {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.location-settings__status-list {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.location-settings__status-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.location-settings__status-list strong {
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+}
+
+.location-settings__form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.location-settings__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.location-settings__field input {
+  font: inherit;
+  font-weight: 400;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.5rem;
+  padding: 0.6rem 0.75rem;
+}
+
+.location-settings__field input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.location-settings__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.location-settings__primary,
+.location-settings__secondary,
+.location-settings__danger {
+  border-radius: 0.5rem;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.55rem 0.9rem;
+  cursor: pointer;
+}
+
+.location-settings__primary {
+  border: none;
+  background: var(--accent);
+  color: #fff;
+}
+
+.location-settings__secondary {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.location-settings__danger {
+  border: 1px solid color-mix(in srgb, var(--bad) 40%, transparent);
+  background: transparent;
+  color: var(--bad);
+}
+
+.location-settings__primary:disabled,
+.location-settings__secondary:disabled,
+.location-settings__danger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.location-settings__error {
+  margin: 0;
+  color: var(--bad);
+  font-size: 0.85rem;
+}
+
+.location-settings__success {
+  margin: 0;
+  color: var(--good);
+  font-size: 0.85rem;
+}
+
+.location-settings__test-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.6rem;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  font-size: 0.9rem;
+}
+
+.location-settings__test-result span {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.location-settings__card--privacy {
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+}
+
+@media (min-width: 760px) {
+  .location-settings__grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .location-settings__card--privacy {
+    grid-column: 1 / -1;
+  }
+}

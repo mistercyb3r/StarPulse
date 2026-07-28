@@ -30,9 +30,14 @@ RESOLVED_ALT_KEY = "weather_resolved_altitude_m"
 
 SOURCE_LABELS = {
     "dish_gps": "Starlink GPS",
-    "configured": "Configured",
+    "configured": "Manual configuration",
     "stored": "Last known",
 }
+
+PRIVACY_NOTE = (
+    "StarPulse does not require location sharing. "
+    "Coordinates can be entered manually and remain local."
+)
 
 
 @dataclass(frozen=True)
@@ -141,6 +146,20 @@ def location_unavailable_message(
     gps_valid = latest.gps_valid if latest is not None else None
     gps_enabled = latest.gps_enabled if latest is not None else None
     return _unavailable_message(gps_valid=gps_valid, gps_enabled=gps_enabled)
+
+
+def clear_manual_and_stored_location(session: Session) -> None:
+    """Remove last-resolved coordinates from ``app_meta`` (config cleared separately)."""
+    for key in (RESOLVED_LAT_KEY, RESOLVED_LON_KEY, RESOLVED_SOURCE_KEY, RESOLVED_ALT_KEY):
+        row = session.get(AppMeta, key)
+        if row is not None:
+            session.delete(row)
+    session.commit()
+
+
+def peek_dish_gps(collector: StarlinkPoller, session: Session) -> ResolvedLocation | None:
+    """Return dish GPS coordinates if available, without writing app_meta."""
+    return _resolve_dish_gps(collector, session)
 
 
 def _resolve_dish_gps(collector: StarlinkPoller, session: Session) -> ResolvedLocation | None:

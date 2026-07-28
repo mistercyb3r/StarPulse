@@ -539,9 +539,12 @@ What it shows:
   status, satellite count, and pointing (azimuth/elevation), from
   `/api/starlink/dish-info`.
 - **Location card** — place name (when reverse geocode succeeds), source
-  (Starlink GPS / Configured / Last known), and altitude when available.
-  If GPS is locked but coordinates were not shared by the dish: “GPS:
-  Locked” / “Coordinates: Not collected yet”.
+  (Starlink GPS / Manual configuration / Last known), and altitude when
+  available. If GPS is locked but coordinates were not shared by the dish:
+  “GPS: Locked” / “Coordinates: Not collected yet”. Open **Location**
+  from the dashboard header for Location Settings (manual lat/lon, test
+  weather lookup, clear saved location). Privacy note: coordinates can
+  stay local without dish location sharing.
 - **Weather card** — temperature, wind, rain %, conditions from
   `/api/weather`.
 - **Signal Conditions card** — Weather Impact severity (Low / Moderate /

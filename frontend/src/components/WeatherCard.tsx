@@ -20,7 +20,7 @@ export function WeatherCard({ weather }: WeatherCardProps) {
       ? "Dish GPS location"
       : weather.location_source === "stored"
         ? "Last known location"
-        : "Configured location";
+        : "Manual configuration";
 
   return (
     <InfoCard

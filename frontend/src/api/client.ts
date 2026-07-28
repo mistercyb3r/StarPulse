@@ -1,7 +1,10 @@
 import type {
   DishInfoResponse,
   HealthResponse,
+  LocationActionResponse,
   LocationResponse,
+  LocationSettingsResponse,
+  ManualLocationRequest,
   OutageSummaryResponse,
   SetupRequest,
   SetupResponse,
@@ -169,6 +172,22 @@ export function getWeather(): Promise<WeatherResponse> {
 
 export function getLocation(): Promise<LocationResponse> {
   return getJson<LocationResponse>("/api/location");
+}
+
+export function getLocationSettings(): Promise<LocationSettingsResponse> {
+  return getJson<LocationSettingsResponse>("/api/location/settings");
+}
+
+export function saveManualLocation(payload: ManualLocationRequest): Promise<LocationActionResponse> {
+  return postJson<LocationActionResponse>("/api/location/manual", payload);
+}
+
+export function clearSavedLocation(): Promise<LocationActionResponse> {
+  return postJson<LocationActionResponse>("/api/location/clear", {});
+}
+
+export function testLocationWeather(payload: ManualLocationRequest): Promise<WeatherResponse> {
+  return postJson<WeatherResponse>("/api/location/test", payload);
 }
 
 export function getWeatherImpact(): Promise<WeatherImpactResponse> {

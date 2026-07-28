@@ -74,7 +74,7 @@ StarPulse/
 │       └── routes/
 │           ├── health.py      # GET /api/health
 │           ├── setup.py       # GET/POST /api/setup (first-run wizard)
-│           └── starlink.py    # GET /api/starlink/{status,history,summary}
+│           └── starlink.py    # GET /api/starlink/{status,history,summary,health,dish-info}
 ├── tests/                     # pytest suite mirroring the package layout
 │   └── collector/              # Collector tests, using mocked dish responses
 ├── frontend/                  # React + TypeScript dashboard (separate app, see below)
@@ -225,6 +225,17 @@ Each poll stores one row in the `telemetry_samples` table:
 | `currently_obstructed` | Whether the dish is obstructed right now              |
 | `snr`                  | Signal-to-noise ratio (often `null`; deprecated by newer dish firmware) |
 | `power_watts`          | Power draw in watts (from bulk history data; `null` if unavailable) |
+| `hardware_version` / `software_version` | Dish model/firmware identification |
+| `gps_valid` / `gps_enabled` / `gps_satellites` | GPS fix state and satellite count |
+| `azimuth_deg` / `elevation_deg` | Dish pointing direction, in degrees |
+
+Adding these dish-info columns to an already-installed database is handled
+automatically: `Database.init_db()` runs a small additive migration
+(`ALTER TABLE ... ADD COLUMN`) for any column declared in `models.py` that
+an existing on-disk database doesn't have yet, so upgrading doesn't
+require deleting your data. It never renames, drops, or alters existing
+columns — that would need a real migration tool, which StarPulse doesn't
+have yet.
 
 ## API
 
@@ -289,14 +300,19 @@ curl "http://localhost:8000/api/starlink/history?start=2026-01-01T00:00:00Z&end=
 
 Returns `{"samples": [...], "count": N}`.
 
-**`GET /api/starlink/summary`** — aggregate stats over a time range.
+**`GET /api/starlink/summary`** — average/peak throughput plus uptime and
+obstruction stats over a time range. Used for the dashboard's selectable
+24h/7d/30d performance statistics.
 
 ```bash
+curl "http://localhost:8000/api/starlink/summary?period=7d"
 curl "http://localhost:8000/api/starlink/summary?start=2026-01-01T00:00:00Z"
 ```
 
-Accepts the same optional `start`/`end` params as `/history` (no
-`limit` — it aggregates over every matching sample) and returns:
+Accepts `start`/`end` (same as `/history`, no `limit` — it aggregates
+over every matching sample) plus an optional `period` shorthand
+(`24h` | `7d` | `30d`) that computes `start` for you and overrides any
+`start`/`end` passed alongside it. Returns:
 
 ```json
 {
@@ -306,13 +322,74 @@ Accepts the same optional `start`/`end` params as `/history` (no
   "average_latency_ms": 28.4,
   "uptime_percent": 99.86,
   "average_obstruction_percent": 0.12,
+  "peak_download_bps": 210000000.0,
+  "peak_upload_bps": 15200000.0,
   "range_start": null,
   "range_end": null
 }
 ```
 
 `uptime_percent` is the share of samples where `connection_state` was
-`CONNECTED`. All averages are `null` when there are no samples in range.
+`CONNECTED`. All averages/peaks are `null` when there are no samples in
+range.
+
+**`GET /api/starlink/health`** — a single 0-100 connection health score,
+derived from recent uptime, latency, and obstruction. Powers the
+dashboard's "Starlink Health" card.
+
+```bash
+curl http://localhost:8000/api/starlink/health
+```
+
+```json
+{
+  "health_score": 96.4,
+  "quality_label": "Excellent",
+  "uptime_percent": 99.6,
+  "latency_ms": 26.5,
+  "obstruction_percent": 0.4,
+  "obstruction_impact": "None",
+  "sample_count": 720,
+  "range_start": "2026-01-01T23:00:00Z",
+  "range_end": null
+}
+```
+
+Accepts optional `start`/`end` params; defaults to the **last hour** so
+the score reflects current conditions rather than being diluted by
+all-time history. `quality_label` is one of `Excellent` / `Good` /
+`Fair` / `Poor` / `Critical` (or `Unknown` with `health_score: null`
+when there's no data in range yet). `obstruction_impact` is one of
+`None` / `Minor` / `Moderate` / `Severe` (or `Unknown`).
+
+The score starts at 100 and subtracts, in order: a 1:1 penalty for
+downtime (`100 - uptime_percent`), up to 25 points for latency above
+20ms, and up to 30 points for obstruction — so a flaky connection hurts
+the score far more than a slow-but-stable one.
+
+**`GET /api/starlink/dish-info`** — dish identification, GPS, and
+pointing info from the latest sample.
+
+```bash
+curl http://localhost:8000/api/starlink/dish-info
+```
+
+```json
+{
+  "connection_state": "CONNECTED",
+  "uptime_seconds": 98765,
+  "hardware_version": "rev3_prod2400",
+  "software_version": "2026.01.01.mr1",
+  "gps_valid": true,
+  "gps_enabled": true,
+  "gps_satellites": 14,
+  "azimuth_deg": 172.4,
+  "elevation_deg": 58.9,
+  "last_updated": "2026-01-02T12:00:00Z"
+}
+```
+
+Returns `404` if no sample has been collected yet.
 
 The backend enables permissive CORS (`Access-Control-Allow-Origin: *`,
 GET/POST only) so the frontend — a separate app, possibly on a different
@@ -334,20 +411,30 @@ What it shows:
   (can the frontend reach the API at all?) alongside the Starlink
   connection-state badge ("Connected"/"Searching"/etc., from the
   latest sample).
-- **Current status**: connection state, download/upload speed, latency,
-  obstruction %, and rolling 24h uptime %, each as its own metric card
-  color-coded by severity (e.g. latency turns amber/red past 50/100ms).
+- **Starlink Health card** — a 0-100 score with a quality label
+  ("Excellent" through "Critical"), plus recent uptime, latency, and
+  obstruction impact, from `/api/starlink/health`.
+- **Current status**: download/upload speed, latency, and obstruction %,
+  each as its own metric card color-coded by severity (e.g. latency
+  turns amber/red past 50/100ms).
+- **Performance statistics** — average/peak download and upload, with a
+  24h / 7d / 30d period selector, from `/api/starlink/summary`.
 - **Speed history** and **latency history** charts over the most recent
   samples.
 - **Connection state timeline** — one colored bar per sample, so brief
   outages/obstructions are visible at a glance.
+- **Dish Information** — model, software version, dish uptime, GPS
+  status, satellite count, and pointing (azimuth/elevation), from
+  `/api/starlink/dish-info`.
 
 It polls `/api/health`, `/api/starlink/status`, `/api/starlink/history`,
-and `/api/starlink/summary` every 5 seconds. If any of those requests
-fail — the backend isn't running, or it's a fresh install with no
-telemetry collected yet — the dashboard falls back to generated mock
-data (all endpoints together, so the numbers stay consistent) and shows
-a banner saying so, rather than an error page or blank screen.
+`/api/starlink/health`, `/api/starlink/dish-info`, and
+`/api/starlink/summary` (re-fetched whenever the performance period
+changes) every 5 seconds. If any of those requests fail — the backend
+isn't running, or it's a fresh install with no telemetry collected yet —
+the dashboard falls back to generated mock data (all endpoints together,
+so the numbers stay consistent) and shows a banner saying so, rather
+than an error page or blank screen.
 
 In development, `vite.config.ts` proxies `/api/*` to
 `http://localhost:8000`, so the browser never makes a cross-origin

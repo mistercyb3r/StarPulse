@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 
 from starpulse.db.models import AppMeta
 from starpulse.db.session import Database
@@ -47,3 +47,23 @@ def test_creates_parent_directory_for_db_file(tmp_path: Path) -> None:
     db.init_db()
 
     assert nested_path.exists()
+
+
+def test_init_db_adds_missing_columns_to_existing_table(tmp_path: Path) -> None:
+    """Simulates upgrading an on-disk database created before a column was added."""
+    db_path = tmp_path / "test.db"
+    db = Database(db_path)
+    db.init_db()
+
+    # Simulate an older schema by dropping a column models.py now declares.
+    with db.engine.begin() as conn:
+        conn.execute(text("ALTER TABLE telemetry_samples DROP COLUMN azimuth_deg"))
+    db.dispose()
+
+    upgraded = Database(db_path)
+    upgraded.init_db()
+
+    inspector = inspect(upgraded.engine)
+    columns = {col["name"] for col in inspector.get_columns("telemetry_samples")}
+    assert "azimuth_deg" in columns
+    upgraded.dispose()

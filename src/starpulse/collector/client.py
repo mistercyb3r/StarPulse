@@ -54,6 +54,15 @@ class StarlinkSample:
     snr: float | None
     power_watts: float | None
 
+    # Static/semi-static dish info, reported alongside every status poll.
+    hardware_version: str | None
+    software_version: str | None
+    gps_valid: bool | None
+    gps_enabled: bool | None
+    gps_satellites: int | None
+    azimuth_deg: float | None
+    elevation_deg: float | None
+
 
 class StarlinkClient(Protocol):
     """Anything that can fetch one telemetry sample from a dish."""
@@ -113,4 +122,11 @@ def _sample_from_status(status: dict[str, Any], power_watts: float | None) -> St
         currently_obstructed=status.get("currently_obstructed"),
         snr=status.get("snr"),
         power_watts=power_watts,
+        hardware_version=status.get("hardware_version"),
+        software_version=status.get("software_version"),
+        gps_valid=status.get("gps_ready"),
+        gps_enabled=status.get("gps_enabled"),
+        gps_satellites=status.get("gps_sats"),
+        azimuth_deg=status.get("direction_azimuth"),
+        elevation_deg=status.get("direction_elevation"),
     )

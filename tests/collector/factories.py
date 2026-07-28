@@ -25,6 +25,13 @@ def make_sample(**overrides: Any) -> StarlinkSample:
         currently_obstructed=False,
         snr=None,
         power_watts=42.0,
+        hardware_version="rev3_prod2400",
+        software_version="2026.01.01.mr1",
+        gps_valid=True,
+        gps_enabled=True,
+        gps_satellites=12,
+        azimuth_deg=180.5,
+        elevation_deg=64.2,
     )
     defaults.update(overrides)
     return StarlinkSample(**defaults)

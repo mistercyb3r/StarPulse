@@ -19,12 +19,21 @@ export interface TelemetrySample {
   currently_obstructed: boolean | null;
   snr: number | null;
   power_watts: number | null;
+  hardware_version: string | null;
+  software_version: string | null;
+  gps_valid: boolean | null;
+  gps_enabled: boolean | null;
+  gps_satellites: number | null;
+  azimuth_deg: number | null;
+  elevation_deg: number | null;
 }
 
 export interface StarlinkHistoryResponse {
   samples: TelemetrySample[];
   count: number;
 }
+
+export type SummaryPeriod = "24h" | "7d" | "30d";
 
 export interface StarlinkSummaryResponse {
   sample_count: number;
@@ -33,8 +42,35 @@ export interface StarlinkSummaryResponse {
   average_latency_ms: number | null;
   uptime_percent: number | null;
   average_obstruction_percent: number | null;
+  peak_download_bps: number | null;
+  peak_upload_bps: number | null;
   range_start: string | null;
   range_end: string | null;
+}
+
+export interface StarlinkHealthResponse {
+  health_score: number | null;
+  quality_label: string;
+  uptime_percent: number | null;
+  latency_ms: number | null;
+  obstruction_percent: number | null;
+  obstruction_impact: string;
+  sample_count: number;
+  range_start: string | null;
+  range_end: string | null;
+}
+
+export interface DishInfoResponse {
+  connection_state: ConnectionState;
+  uptime_seconds: number | null;
+  hardware_version: string | null;
+  software_version: string | null;
+  gps_valid: boolean | null;
+  gps_enabled: boolean | null;
+  gps_satellites: number | null;
+  azimuth_deg: number | null;
+  elevation_deg: number | null;
+  last_updated: string;
 }
 
 export interface HealthResponse {

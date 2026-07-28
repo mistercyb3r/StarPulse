@@ -16,6 +16,13 @@ RAW_STATUS = {
     "pop_ping_latency_ms": 27.3,
     "fraction_obstructed": 0.015,
     "currently_obstructed": True,
+    "hardware_version": "rev3_prod2400",
+    "software_version": "2026.01.01.mr1",
+    "gps_ready": True,
+    "gps_enabled": True,
+    "gps_sats": 14,
+    "direction_azimuth": 172.4,
+    "direction_elevation": 58.9,
 }
 
 
@@ -44,6 +51,13 @@ def test_fetch_sample_maps_status_fields(monkeypatch: pytest.MonkeyPatch) -> Non
     assert sample.currently_obstructed is True
     assert sample.snr is None
     assert sample.power_watts == 42.5
+    assert sample.hardware_version == "rev3_prod2400"
+    assert sample.software_version == "2026.01.01.mr1"
+    assert sample.gps_valid is True
+    assert sample.gps_enabled is True
+    assert sample.gps_satellites == 14
+    assert sample.azimuth_deg == pytest.approx(172.4)
+    assert sample.elevation_deg == pytest.approx(58.9)
 
 
 def test_fetch_sample_wraps_grpc_errors(monkeypatch: pytest.MonkeyPatch) -> None:

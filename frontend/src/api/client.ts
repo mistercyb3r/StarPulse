@@ -1,10 +1,13 @@
 import type {
+  DishInfoResponse,
   HealthResponse,
   SetupRequest,
   SetupResponse,
   SetupStatusResponse,
+  StarlinkHealthResponse,
   StarlinkHistoryResponse,
   StarlinkSummaryResponse,
+  SummaryPeriod,
   TelemetrySample,
 } from "./types";
 
@@ -128,9 +131,24 @@ export function getStarlinkHistory(params: HistoryParams = {}): Promise<Starlink
 export interface SummaryParams {
   start?: string;
   end?: string;
+  period?: SummaryPeriod;
   [key: string]: string | number | undefined;
 }
 
 export function getStarlinkSummary(params: SummaryParams = {}): Promise<StarlinkSummaryResponse> {
   return getJson<StarlinkSummaryResponse>("/api/starlink/summary", params);
+}
+
+export interface HealthParams {
+  start?: string;
+  end?: string;
+  [key: string]: string | number | undefined;
+}
+
+export function getStarlinkHealth(params: HealthParams = {}): Promise<StarlinkHealthResponse> {
+  return getJson<StarlinkHealthResponse>("/api/starlink/health", params);
+}
+
+export function getDishInfo(): Promise<DishInfoResponse> {
+  return getJson<DishInfoResponse>("/api/starlink/dish-info");
 }

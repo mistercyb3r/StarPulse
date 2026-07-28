@@ -1,0 +1,122 @@
+.health-card {
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1.75rem;
+  flex-wrap: wrap;
+}
+
+.health-card--good {
+  --ring-color: var(--good);
+}
+.health-card--warn {
+  --ring-color: var(--warn);
+}
+.health-card--bad {
+  --ring-color: var(--bad);
+}
+.health-card--neutral {
+  --ring-color: var(--text-muted);
+}
+
+.health-card__ring {
+  position: relative;
+  width: 116px;
+  height: 116px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--ring-color) calc(var(--score, 0) * 1%), var(--surface-raised) 0);
+}
+
+.health-card__ring-inner {
+  position: absolute;
+  inset: 9px;
+  border-radius: 50%;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.health-card__score {
+  font-size: 2.1rem;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.health-card__score-max {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+
+.health-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  flex: 1;
+  min-width: 220px;
+}
+
+.health-card__heading {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.health-card__label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.health-card__quality {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.health-card__quality--good {
+  color: var(--good);
+}
+.health-card__quality--warn {
+  color: var(--warn);
+}
+.health-card__quality--bad {
+  color: var(--bad);
+}
+.health-card__quality--neutral {
+  color: var(--text-muted);
+}
+
+.health-card__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 1rem;
+}
+
+.health-card__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.health-card__stat-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.health-card__stat-value {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}

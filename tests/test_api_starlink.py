@@ -111,6 +111,8 @@ def test_summary_with_no_samples(client: TestClient) -> None:
     assert body["average_latency_ms"] is None
     assert body["average_obstruction_percent"] is None
     assert body["uptime_percent"] is None
+    assert body["peak_download_bps"] is None
+    assert body["peak_upload_bps"] is None
 
 
 def test_summary_computes_averages_and_uptime(app: FastAPI, client: TestClient) -> None:
@@ -173,3 +175,98 @@ def test_summary_respects_time_range(app: FastAPI, client: TestClient) -> None:
     assert body["sample_count"] == 1
     assert body["average_download_bps"] == pytest.approx(300.0)
     assert body["uptime_percent"] == pytest.approx(100.0)
+
+
+def test_summary_includes_peak_values(app: FastAPI, client: TestClient) -> None:
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    _insert_sample(app, timestamp=base, download_bps=100.0, upload_bps=10.0)
+    _insert_sample(app, timestamp=base + timedelta(hours=1), download_bps=500.0, upload_bps=50.0)
+    _insert_sample(app, timestamp=base + timedelta(hours=2), download_bps=200.0, upload_bps=20.0)
+
+    response = client.get("/api/starlink/summary")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["peak_download_bps"] == pytest.approx(500.0)
+    assert body["peak_upload_bps"] == pytest.approx(50.0)
+
+
+def test_summary_period_shorthand_overrides_start(app: FastAPI, client: TestClient) -> None:
+    old = datetime.now(timezone.utc) - timedelta(days=10)
+    recent = datetime.now(timezone.utc) - timedelta(hours=1)
+    _insert_sample(app, timestamp=old, download_bps=999.0)
+    _insert_sample(app, timestamp=recent, download_bps=111.0)
+
+    response = client.get("/api/starlink/summary", params={"period": "24h"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["sample_count"] == 1
+    assert body["average_download_bps"] == pytest.approx(111.0)
+
+
+def test_summary_rejects_unknown_period(client: TestClient) -> None:
+    response = client.get("/api/starlink/summary", params={"period": "1y"})
+
+    assert response.status_code == 422
+
+
+def test_health_with_no_samples(client: TestClient) -> None:
+    response = client.get("/api/starlink/health")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["health_score"] is None
+    assert body["quality_label"] == "Unknown"
+    assert body["sample_count"] == 0
+
+
+def test_health_reflects_recent_samples(app: FastAPI, client: TestClient) -> None:
+    now = datetime.now(timezone.utc)
+    _insert_sample(
+        app,
+        timestamp=now - timedelta(minutes=5),
+        connection_state="CONNECTED",
+        latency_ms=15.0,
+        obstruction_percent=0.0,
+    )
+
+    response = client.get("/api/starlink/health")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["health_score"] == pytest.approx(100.0)
+    assert body["quality_label"] == "Excellent"
+    assert body["obstruction_impact"] == "None"
+
+
+def test_dish_info_returns_404_when_no_samples(client: TestClient) -> None:
+    response = client.get("/api/starlink/dish-info")
+
+    assert response.status_code == 404
+
+
+def test_dish_info_returns_latest_sample_fields(app: FastAPI, client: TestClient) -> None:
+    _insert_sample(
+        app,
+        connection_state="CONNECTED",
+        hardware_version="rev3_prod2400",
+        software_version="2026.01.01.mr1",
+        gps_valid=True,
+        gps_enabled=True,
+        gps_satellites=16,
+        azimuth_deg=180.0,
+        elevation_deg=65.0,
+    )
+
+    response = client.get("/api/starlink/dish-info")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["hardware_version"] == "rev3_prod2400"
+    assert body["software_version"] == "2026.01.01.mr1"
+    assert body["gps_valid"] is True
+    assert body["gps_satellites"] == 16
+    assert body["azimuth_deg"] == pytest.approx(180.0)
+    assert body["elevation_deg"] == pytest.approx(65.0)
+    assert "last_updated" in body

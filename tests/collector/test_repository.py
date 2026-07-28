@@ -7,6 +7,7 @@ import pytest
 
 from starpulse.collector.repository import (
     count_samples,
+    get_health_score,
     get_latest_sample,
     get_recent_samples,
     get_summary,
@@ -22,13 +23,23 @@ def test_save_sample_persists_all_fields(tmp_path: Path) -> None:
     db.init_db()
     session = next(db.get_session())
     try:
-        sample = make_sample(connection_state="CONNECTED", download_bps=100.0, power_watts=33.3)
+        sample = make_sample(
+            connection_state="CONNECTED",
+            download_bps=100.0,
+            power_watts=33.3,
+            hardware_version="rev3_prod2400",
+            gps_satellites=12,
+            azimuth_deg=180.5,
+        )
         row = save_sample(session, sample)
 
         assert row.id is not None
         assert row.connection_state == "CONNECTED"
         assert row.download_bps == 100.0
         assert row.power_watts == 33.3
+        assert row.hardware_version == "rev3_prod2400"
+        assert row.gps_satellites == 12
+        assert row.azimuth_deg == pytest.approx(180.5)
         assert count_samples(session) == 1
     finally:
         session.close()
@@ -151,6 +162,8 @@ def test_get_summary_computes_averages_and_uptime(tmp_path: Path) -> None:
         assert stats.average_latency_ms == pytest.approx(40.0)
         assert stats.average_obstruction_percent == pytest.approx(2.0)
         assert stats.uptime_percent == pytest.approx(50.0)
+        assert stats.peak_download_bps == pytest.approx(300.0)
+        assert stats.peak_upload_bps == pytest.approx(30.0)
     finally:
         session.close()
 
@@ -168,5 +181,90 @@ def test_get_summary_respects_time_range(tmp_path: Path) -> None:
 
         assert stats.sample_count == 1
         assert stats.uptime_percent == pytest.approx(100.0)
+    finally:
+        session.close()
+
+
+def test_get_health_score_with_no_samples(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    session = next(db.get_session())
+    try:
+        health = get_health_score(session)
+
+        assert health.score is None
+        assert health.quality_label == "Unknown"
+        assert health.obstruction_impact == "Unknown"
+        assert health.sample_count == 0
+    finally:
+        session.close()
+
+
+def test_get_health_score_perfect_connection(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    session = next(db.get_session())
+    try:
+        base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        for i in range(3):
+            save_sample(
+                session,
+                make_sample(
+                    timestamp=base + timedelta(minutes=i),
+                    connection_state="CONNECTED",
+                    latency_ms=15.0,
+                    obstruction_percent=0.0,
+                ),
+            )
+
+        health = get_health_score(session, start=base, end=base + timedelta(hours=1))
+
+        assert health.score == pytest.approx(100.0)
+        assert health.quality_label == "Excellent"
+        assert health.uptime_percent == pytest.approx(100.0)
+        assert health.obstruction_impact == "None"
+    finally:
+        session.close()
+
+
+def test_get_health_score_penalizes_downtime_latency_and_obstruction(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    session = next(db.get_session())
+    try:
+        base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+        save_sample(
+            session,
+            make_sample(
+                timestamp=base,
+                connection_state="SEARCHING",
+                latency_ms=120.0,
+                obstruction_percent=8.0,
+            ),
+        )
+
+        health = get_health_score(session, start=base, end=base + timedelta(hours=1))
+
+        # 0% uptime alone drives the score to the floor, regardless of other penalties.
+        assert health.score == pytest.approx(0.0)
+        assert health.quality_label == "Critical"
+        assert health.uptime_percent == pytest.approx(0.0)
+        assert health.obstruction_impact == "Moderate"
+    finally:
+        session.close()
+
+
+def test_get_health_score_defaults_to_last_hour(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    session = next(db.get_session())
+    try:
+        old = datetime.now(timezone.utc) - timedelta(hours=5)
+        save_sample(session, make_sample(timestamp=old, connection_state="SEARCHING", latency_ms=500.0))
+
+        health = get_health_score(session)
+
+        assert health.sample_count == 0
+        assert health.score is None
     finally:
         session.close()

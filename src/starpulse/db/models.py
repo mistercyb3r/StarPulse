@@ -71,3 +71,16 @@ class TelemetrySample(Base):
     # Power draw, in watts. Only available via the dish's bulk history
     # data (not the general status), so may be null if that call fails.
     power_watts: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Dish hardware/software identification, reported on every status poll.
+    hardware_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    software_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+    # GPS fix state and satellite count used for dish self-positioning.
+    gps_valid: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    gps_enabled: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    gps_satellites: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
+    # Dish pointing direction, in degrees.
+    azimuth_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
+    elevation_deg: Mapped[float | None] = mapped_column(Float, nullable=True)

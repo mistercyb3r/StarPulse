@@ -10,7 +10,7 @@ storage/query logic isn't duplicated between the collector and the API.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
@@ -35,6 +35,13 @@ def save_sample(session: Session, sample: StarlinkSample) -> TelemetrySample:
         currently_obstructed=sample.currently_obstructed,
         snr=sample.snr,
         power_watts=sample.power_watts,
+        hardware_version=sample.hardware_version,
+        software_version=sample.software_version,
+        gps_valid=sample.gps_valid,
+        gps_enabled=sample.gps_enabled,
+        gps_satellites=sample.gps_satellites,
+        azimuth_deg=sample.azimuth_deg,
+        elevation_deg=sample.elevation_deg,
     )
     session.add(row)
     session.commit()
@@ -80,6 +87,8 @@ class SummaryStats:
     average_latency_ms: float | None
     average_obstruction_percent: float | None
     uptime_percent: float | None
+    peak_download_bps: float | None
+    peak_upload_bps: float | None
 
 
 def get_summary(
@@ -87,7 +96,7 @@ def get_summary(
     start: datetime | None = None,
     end: datetime | None = None,
 ) -> SummaryStats:
-    """Compute averages and uptime percentage over samples in ``[start, end]``."""
+    """Compute averages, peaks, and uptime percentage over samples in ``[start, end]``."""
     connected_flag = case((TelemetrySample.connection_state == CONNECTED_STATE, 1), else_=0)
 
     stmt = select(
@@ -97,12 +106,21 @@ def get_summary(
         func.avg(TelemetrySample.latency_ms),
         func.avg(TelemetrySample.obstruction_percent),
         func.sum(connected_flag),
+        func.max(TelemetrySample.download_bps),
+        func.max(TelemetrySample.upload_bps),
     )
     stmt = _apply_range(stmt, start, end)
 
-    sample_count, avg_download, avg_upload, avg_latency, avg_obstruction, connected_count = session.execute(
-        stmt
-    ).one()
+    (
+        sample_count,
+        avg_download,
+        avg_upload,
+        avg_latency,
+        avg_obstruction,
+        connected_count,
+        peak_download,
+        peak_upload,
+    ) = session.execute(stmt).one()
 
     uptime_percent = None
     if sample_count:
@@ -115,7 +133,111 @@ def get_summary(
         average_latency_ms=avg_latency,
         average_obstruction_percent=avg_obstruction,
         uptime_percent=uptime_percent,
+        peak_download_bps=peak_download,
+        peak_upload_bps=peak_upload,
     )
+
+
+# Health score weighting. Uptime dominates (a flaky connection is worse than
+# a slightly slow one); latency and obstruction are capped so a single bad
+# metric can't single-handedly zero out an otherwise-healthy connection.
+_LATENCY_FREE_MS = 20.0
+_LATENCY_PENALTY_PER_MS = 0.25
+_LATENCY_PENALTY_CAP = 25.0
+_OBSTRUCTION_PENALTY_PER_PERCENT = 2.0
+_OBSTRUCTION_PENALTY_CAP = 30.0
+
+_DEFAULT_HEALTH_WINDOW = timedelta(hours=1)
+
+
+@dataclass(frozen=True)
+class HealthScore:
+    """A single 0-100 "how good is my Starlink right now" score, plus its inputs."""
+
+    score: float | None
+    quality_label: str
+    uptime_percent: float | None
+    latency_ms: float | None
+    obstruction_percent: float | None
+    obstruction_impact: str
+    sample_count: int
+    range_start: datetime | None
+    range_end: datetime | None
+
+
+def get_health_score(
+    session: Session,
+    start: datetime | None = None,
+    end: datetime | None = None,
+) -> HealthScore:
+    """Compute a 0-100 health score from recent uptime, latency, and obstruction.
+
+    Defaults to the last hour when neither ``start`` nor ``end`` is given,
+    so the score reflects current conditions rather than all-time history.
+    """
+    if start is None and end is None:
+        start = datetime.now(timezone.utc) - _DEFAULT_HEALTH_WINDOW
+
+    stats = get_summary(session, start=start, end=end)
+
+    if stats.sample_count == 0:
+        return HealthScore(
+            score=None,
+            quality_label="Unknown",
+            uptime_percent=None,
+            latency_ms=None,
+            obstruction_percent=None,
+            obstruction_impact="Unknown",
+            sample_count=0,
+            range_start=start,
+            range_end=end,
+        )
+
+    uptime_percent = stats.uptime_percent or 0.0
+    latency_ms = stats.average_latency_ms
+    obstruction_percent = stats.average_obstruction_percent or 0.0
+
+    uptime_penalty = 100.0 - uptime_percent
+    latency_penalty = 0.0
+    if latency_ms is not None:
+        latency_penalty = min(max(latency_ms - _LATENCY_FREE_MS, 0.0) * _LATENCY_PENALTY_PER_MS, _LATENCY_PENALTY_CAP)
+    obstruction_penalty = min(obstruction_percent * _OBSTRUCTION_PENALTY_PER_PERCENT, _OBSTRUCTION_PENALTY_CAP)
+
+    score = max(0.0, min(100.0, 100.0 - uptime_penalty - latency_penalty - obstruction_penalty))
+
+    return HealthScore(
+        score=round(score, 1),
+        quality_label=_quality_label(score),
+        uptime_percent=stats.uptime_percent,
+        latency_ms=latency_ms,
+        obstruction_percent=stats.average_obstruction_percent,
+        obstruction_impact=_obstruction_impact(obstruction_percent),
+        sample_count=stats.sample_count,
+        range_start=start,
+        range_end=end,
+    )
+
+
+def _quality_label(score: float) -> str:
+    if score >= 90:
+        return "Excellent"
+    if score >= 75:
+        return "Good"
+    if score >= 50:
+        return "Fair"
+    if score >= 25:
+        return "Poor"
+    return "Critical"
+
+
+def _obstruction_impact(obstruction_percent: float) -> str:
+    if obstruction_percent <= 0.1:
+        return "None"
+    if obstruction_percent <= 2:
+        return "Minor"
+    if obstruction_percent <= 10:
+        return "Moderate"
+    return "Severe"
 
 
 def _apply_range(stmt, start: datetime | None, end: datetime | None):

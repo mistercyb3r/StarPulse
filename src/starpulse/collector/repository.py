@@ -40,6 +40,8 @@ def save_sample(session: Session, sample: StarlinkSample) -> TelemetrySample:
         gps_valid=sample.gps_valid,
         gps_enabled=sample.gps_enabled,
         gps_satellites=sample.gps_satellites,
+        latitude=sample.latitude,
+        longitude=sample.longitude,
         azimuth_deg=sample.azimuth_deg,
         elevation_deg=sample.elevation_deg,
     )
@@ -53,6 +55,24 @@ def get_latest_sample(session: Session) -> TelemetrySample | None:
     """Return the most recently recorded sample, if any."""
     stmt = select(TelemetrySample).order_by(TelemetrySample.timestamp.desc()).limit(1)
     return session.execute(stmt).scalar_one_or_none()
+
+
+def get_latest_dish_location(session: Session) -> tuple[float, float] | None:
+    """Return the most recent dish GPS coordinates stored in telemetry, if any.
+
+    Used as a weather fallback after restart, before the poller has had a
+    chance to refresh ``dish_location`` in memory.
+    """
+    stmt = (
+        select(TelemetrySample.latitude, TelemetrySample.longitude)
+        .where(TelemetrySample.latitude.is_not(None), TelemetrySample.longitude.is_not(None))
+        .order_by(TelemetrySample.timestamp.desc())
+        .limit(1)
+    )
+    row = session.execute(stmt).one_or_none()
+    if row is None:
+        return None
+    return float(row.latitude), float(row.longitude)
 
 
 def get_recent_samples(

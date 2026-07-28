@@ -34,6 +34,8 @@ class TelemetrySampleResponse(BaseModel):
     gps_valid: bool | None
     gps_enabled: bool | None
     gps_satellites: int | None
+    latitude: float | None
+    longitude: float | None
     azimuth_deg: float | None
     elevation_deg: float | None
 

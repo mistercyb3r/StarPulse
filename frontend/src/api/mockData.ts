@@ -50,6 +50,8 @@ function buildSample(index: number, timestamp: Date): TelemetrySample {
     gps_satellites: 14 + Math.round(wobble * 4),
     azimuth_deg: Math.round((172 + wobble * 4) * 10) / 10,
     elevation_deg: Math.round((59 + wobble * 4) * 10) / 10,
+    latitude: 51.5074,
+    longitude: -0.1278,
   };
 }
 

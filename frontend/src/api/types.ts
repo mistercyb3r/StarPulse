@@ -24,8 +24,10 @@ export interface TelemetrySample {
   gps_valid: boolean | null;
   gps_enabled: boolean | null;
   gps_satellites: number | null;
-  azimuth_deg: number | null;
-  elevation_deg: number | null;
+    azimuth_deg: number | null;
+    elevation_deg: number | null;
+    latitude: number | null;
+    longitude: number | null;
 }
 
 export interface StarlinkHistoryResponse {

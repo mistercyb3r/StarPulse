@@ -60,6 +60,10 @@ class StarlinkSample:
     gps_valid: bool | None
     gps_enabled: bool | None
     gps_satellites: int | None
+    # Dish GPS coordinates from ``get_location`` (null when location sharing
+    # isn't authorized). Distinct from the pointing azimuth/elevation.
+    latitude: float | None
+    longitude: float | None
     azimuth_deg: float | None
     elevation_deg: float | None
 
@@ -156,6 +160,10 @@ def _sample_from_status(status: dict[str, Any], power_watts: float | None) -> St
         gps_valid=status.get("gps_ready"),
         gps_enabled=status.get("gps_enabled"),
         gps_satellites=status.get("gps_sats"),
+        # Coordinates come from a separate location RPC; the poller fills
+        # these in after ``fetch_location`` when available.
+        latitude=None,
+        longitude=None,
         azimuth_deg=status.get("direction_azimuth"),
         elevation_deg=status.get("direction_elevation"),
     )

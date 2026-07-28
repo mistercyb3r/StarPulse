@@ -30,6 +30,8 @@ def make_sample(**overrides: Any) -> StarlinkSample:
         gps_valid=True,
         gps_enabled=True,
         gps_satellites=12,
+        latitude=None,
+        longitude=None,
         azimuth_deg=180.5,
         elevation_deg=64.2,
     )

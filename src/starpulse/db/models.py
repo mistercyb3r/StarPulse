@@ -81,6 +81,10 @@ class TelemetrySample(Base):
     gps_enabled: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
     gps_satellites: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
+    # Dish GPS coordinates (degrees), from the dish location RPC when authorized.
+    latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+
     # Dish pointing direction, in degrees.
     azimuth_deg: Mapped[float | None] = mapped_column(Float, nullable=True)
     elevation_deg: Mapped[float | None] = mapped_column(Float, nullable=True)

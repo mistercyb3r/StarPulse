@@ -9,6 +9,7 @@ CLI command, or a standalone script without any web framework involved.
 from __future__ import annotations
 
 import threading
+from dataclasses import replace
 from datetime import datetime, timezone
 from typing import Callable, Optional
 
@@ -46,7 +47,6 @@ class StarlinkPoller:
         self._thread: Optional[threading.Thread] = None
         self._last_poll_ok: Optional[bool] = None
         self._dish_location: Optional[tuple[float, float]] = None
-        self._location_checked = False
 
     @property
     def is_running(self) -> bool:
@@ -63,11 +63,12 @@ class StarlinkPoller:
 
     @property
     def dish_location(self) -> Optional[tuple[float, float]]:
-        """The dish's GPS (latitude, longitude), if location sharing is enabled on it.
+        """The latest dish GPS (latitude, longitude) known to this poller.
 
-        ``None`` until the poller has had a chance to check (once, on its
-        first successful poll after startup or a reconfigure), or if the
-        dish doesn't support/authorize location sharing.
+        Updated on every successful poll when the dish authorizes location
+        sharing. Keeps the last good reading across transient failures so
+        weather/location consumers don't flap. ``None`` until the first
+        successful location fetch (or after a reconfigure clears it).
         """
         return self._dish_location
 
@@ -88,7 +89,6 @@ class StarlinkPoller:
         self._interval_seconds = interval_seconds
         self._last_poll_ok = None
         self._dish_location = None
-        self._location_checked = False
 
         if was_running:
             self.start()
@@ -128,9 +128,7 @@ class StarlinkPoller:
                 self._on_error(exc)
             return None
 
-        if not self._location_checked:
-            self._location_checked = True
-            self._dish_location = self._safe_fetch_location()
+        sample = self._attach_dish_location(sample)
 
         session = next(self._database.get_session())
         try:
@@ -144,8 +142,18 @@ class StarlinkPoller:
             self._outage_tracker.record_success(sample)
         return row
 
+    def _attach_dish_location(self, sample):
+        """Refresh/cache dish GPS and copy the latest known coords onto the sample."""
+        fetched = self._safe_fetch_location()
+        if fetched is not None:
+            self._dish_location = fetched
+        if self._dish_location is None:
+            return sample
+        latitude, longitude = self._dish_location
+        return replace(sample, latitude=latitude, longitude=longitude)
+
     def _safe_fetch_location(self) -> Optional[tuple[float, float]]:
-        """Best-effort, once-per-lifetime fetch of the dish's GPS position.
+        """Best-effort fetch of the dish's GPS position.
 
         Not every ``StarlinkClient`` implements ``fetch_location`` (it's
         optional, duck-typed rather than part of the core protocol), and

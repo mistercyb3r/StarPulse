@@ -3,6 +3,8 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+import pytest
+
 from starpulse.collector.outages import OutageTracker
 from starpulse.collector.poller import StarlinkPoller
 from starpulse.collector.repository import get_open_connection_event
@@ -194,7 +196,7 @@ def test_poll_once_without_outage_tracker_still_works(tmp_path: Path) -> None:
     assert row is not None
 
 
-def test_poll_once_fetches_dish_location_once(tmp_path: Path) -> None:
+def test_poll_once_stores_and_refreshes_dish_location(tmp_path: Path) -> None:
     db = Database(tmp_path / "test.db")
     db.init_db()
     client = FakeStarlinkClient(samples=[make_sample(), make_sample()], location=(51.5, -0.1))
@@ -202,13 +204,33 @@ def test_poll_once_fetches_dish_location_once(tmp_path: Path) -> None:
 
     assert poller.dish_location is None
 
-    poller.poll_once()
+    row = poller.poll_once()
     assert poller.dish_location == (51.5, -0.1)
     assert client.location_calls == 1
+    assert row is not None
+    assert row.latitude == pytest.approx(51.5)
+    assert row.longitude == pytest.approx(-0.1)
 
     poller.poll_once()
-    # Only checked once per poller lifetime, not on every successful poll.
-    assert client.location_calls == 1
+    # Location is refreshed on every successful poll so telemetry stays current.
+    assert client.location_calls == 2
+    assert poller.dish_location == (51.5, -0.1)
+
+
+def test_poll_once_keeps_last_known_location_when_refresh_fails(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    client = FakeStarlinkClient(samples=[make_sample(), make_sample()], location=(51.5, -0.1))
+    poller = StarlinkPoller(client, db, interval_seconds=999)
+
+    poller.poll_once()
+    client._location = None
+    row = poller.poll_once()
+
+    assert poller.dish_location == (51.5, -0.1)
+    assert row is not None
+    assert row.latitude == pytest.approx(51.5)
+    assert row.longitude == pytest.approx(-0.1)
 
 
 def test_poll_once_tolerates_client_without_fetch_location(tmp_path: Path) -> None:

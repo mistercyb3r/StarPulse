@@ -77,9 +77,9 @@ poll_interval_seconds = 5.0
 # Shows current weather on the dashboard (via the free Open-Meteo API,
 # no API key required).
 enabled = true
-# Leave blank to use the dish's own GPS position when available (this
-# needs location sharing enabled on the dish, and may not be authorized
-# on every install). Otherwise, set your coordinates explicitly, e.g.
+# Leave blank to use the dish's own GPS position automatically when
+# available (location sharing must be enabled on the dish). Setting
+# coordinates here always overrides dish GPS, e.g.
 # latitude = "51.5074", longitude = "-0.1278" for London.
 latitude = ""
 longitude = ""

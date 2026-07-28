@@ -34,6 +34,8 @@ def test_save_sample_persists_all_fields(tmp_path: Path) -> None:
             power_watts=33.3,
             hardware_version="rev3_prod2400",
             gps_satellites=12,
+            latitude=51.5074,
+            longitude=-0.1278,
             azimuth_deg=180.5,
         )
         row = save_sample(session, sample)
@@ -44,8 +46,39 @@ def test_save_sample_persists_all_fields(tmp_path: Path) -> None:
         assert row.power_watts == 33.3
         assert row.hardware_version == "rev3_prod2400"
         assert row.gps_satellites == 12
+        assert row.latitude == pytest.approx(51.5074)
+        assert row.longitude == pytest.approx(-0.1278)
         assert row.azimuth_deg == pytest.approx(180.5)
         assert count_samples(session) == 1
+    finally:
+        session.close()
+
+
+def test_get_latest_dish_location_returns_most_recent_coords(tmp_path: Path) -> None:
+    from starpulse.collector.repository import get_latest_dish_location
+
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    session = next(db.get_session())
+    try:
+        save_sample(session, make_sample(timestamp=datetime(2026, 1, 1, tzinfo=timezone.utc), latitude=1.0, longitude=2.0))
+        save_sample(session, make_sample(timestamp=datetime(2026, 1, 2, tzinfo=timezone.utc), latitude=3.0, longitude=4.0))
+        save_sample(session, make_sample(timestamp=datetime(2026, 1, 3, tzinfo=timezone.utc), latitude=None, longitude=None))
+
+        assert get_latest_dish_location(session) == (3.0, 4.0)
+    finally:
+        session.close()
+
+
+def test_get_latest_dish_location_returns_none_when_no_coords(tmp_path: Path) -> None:
+    from starpulse.collector.repository import get_latest_dish_location
+
+    db = Database(tmp_path / "test.db")
+    db.init_db()
+    session = next(db.get_session())
+    try:
+        save_sample(session, make_sample(latitude=None, longitude=None))
+        assert get_latest_dish_location(session) is None
     finally:
         session.close()
 

@@ -10,15 +10,18 @@ from __future__ import annotations
 
 import threading
 from dataclasses import replace
-from datetime import datetime, timezone
-from typing import Callable, Optional
+from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING, Callable, Optional
 
 from starpulse.collector.client import DishCoordinates, StarlinkClient, StarlinkUnavailableError
 from starpulse.collector.outages import OutageTracker
-from starpulse.collector.repository import save_sample
+from starpulse.collector.repository import get_health_score, save_sample
 from starpulse.db.models import TelemetrySample
 from starpulse.db.session import Database
 from starpulse.logging_config import get_logger
+
+if TYPE_CHECKING:
+    from starpulse.services.notifications import NotificationService
 
 logger = get_logger(__name__)
 
@@ -37,12 +40,14 @@ class StarlinkPoller:
         interval_seconds: float,
         on_error: Optional[Callable[[Exception], None]] = None,
         outage_tracker: Optional[OutageTracker] = None,
+        notifications: Optional["NotificationService"] = None,
     ) -> None:
         self._client = client
         self._database = database
         self._interval_seconds = interval_seconds
         self._on_error = on_error
         self._outage_tracker = outage_tracker
+        self._notifications = notifications
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._last_poll_ok: Optional[bool] = None
@@ -140,9 +145,35 @@ class StarlinkPoller:
         finally:
             session.close()
 
+        transition = None
         if self._outage_tracker is not None:
-            self._outage_tracker.record_success(sample)
+            transition = self._outage_tracker.record_success(sample)
+
+        # Performance warnings only while the link looks connected/healthy
+        # enough that outage tracking did not just open an event.
+        if self._notifications is not None and (transition is None or transition.opened is None):
+            self._emit_sample_warnings(sample)
+
         return row
+
+    def _emit_sample_warnings(self, sample) -> None:
+        assert self._notifications is not None
+        health_score = None
+        session = next(self._database.get_session())
+        try:
+            end = sample.timestamp
+            start = end - timedelta(hours=1)
+            health = get_health_score(session, start=start, end=end)
+            health_score = health.score
+        except Exception:
+            logger.debug("Could not compute health score for notifications", exc_info=True)
+        finally:
+            session.close()
+
+        try:
+            self._notifications.evaluate_sample_warnings(sample, health_score=health_score)
+        except Exception:
+            logger.exception("Notification dispatch failed for sample warnings")
 
     def _attach_dish_location(self, sample):
         """Refresh/cache dish GPS and copy the latest known coords onto the sample.

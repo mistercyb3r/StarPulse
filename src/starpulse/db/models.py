@@ -136,3 +136,23 @@ class WeatherSample(Base):
     longitude: Mapped[float] = mapped_column(Float, nullable=False)
     # One of: "configured", "dish_gps", "stored".
     location_source: Mapped[str] = mapped_column(String(32), nullable=False)
+
+
+class NotificationEvent(Base):
+    """One notification attempt (email), stored for history and cooldown checks."""
+
+    __tablename__ = "notification_events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True, default=_utcnow)
+
+    # e.g. starlink_offline, starlink_recovered, high_latency, packet_loss,
+    # high_obstruction, server_health, test.
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    channel: Mapped[str] = mapped_column(String(32), nullable=False, default="email")
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    body: Mapped[str] = mapped_column(String, nullable=False)
+
+    # "sent", "failed", "suppressed" (disabled / cooldown / incomplete SMTP).
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    error_message: Mapped[str | None] = mapped_column(String, nullable=True)

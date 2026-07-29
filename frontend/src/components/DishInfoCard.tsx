@@ -32,7 +32,7 @@ export function DishInfoCard({ info }: DishInfoCardProps) {
   ];
 
   return (
-    <ChartCard title="Dish Information" subtitle="Hardware, GPS, and pointing details">
+    <ChartCard title="🖥️ Dish Information" subtitle="Hardware, GPS, and pointing details">
       <dl className="dish-info">
         {rows.map(([label, value]) => (
           <div className="dish-info__row" key={label}>

@@ -11,7 +11,7 @@ interface LatencyStatsCardProps {
 export function LatencyStatsCard({ current, stats, periodLabel }: LatencyStatsCardProps) {
   return (
     <InfoCard
-      title="📡 Latency"
+      title="📈 Latency"
       subtitle={`Best/worst over ${periodLabel.toLowerCase()}`}
       rows={[
         { label: "Current", value: formatMs(current?.latency_ms) },

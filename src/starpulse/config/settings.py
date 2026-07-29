@@ -30,6 +30,14 @@ _ENV_OVERRIDES: dict[str, tuple[str, str]] = {
     "STARPULSE_WEATHER_ENABLED": ("weather", "enabled"),
     "STARPULSE_WEATHER_LATITUDE": ("weather", "latitude"),
     "STARPULSE_WEATHER_LONGITUDE": ("weather", "longitude"),
+    "STARPULSE_NOTIFICATIONS_ENABLED": ("notifications", "enabled"),
+    "STARPULSE_SMTP_HOST": ("notifications", "smtp_host"),
+    "STARPULSE_SMTP_PORT": ("notifications", "smtp_port"),
+    "STARPULSE_SMTP_USER": ("notifications", "smtp_user"),
+    "STARPULSE_SMTP_PASSWORD": ("notifications", "smtp_password"),
+    "STARPULSE_SMTP_FROM": ("notifications", "smtp_from"),
+    "STARPULSE_SMTP_TO": ("notifications", "smtp_to"),
+    "STARPULSE_SMTP_USE_TLS": ("notifications", "smtp_use_tls"),
 }
 
 
@@ -69,6 +77,29 @@ class WeatherSettings(BaseModel):
         return value
 
 
+class NotificationsSettings(BaseModel):
+    enabled: bool = False
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_to: str = ""
+    smtp_use_tls: bool = True
+    cooldown_seconds: float = 900.0
+    latency_warn_ms: float = 100.0
+    packet_loss_warn: float = 0.1
+    obstruction_warn_percent: float = 5.0
+    health_warn_score: float = 50.0
+
+    @field_validator("smtp_host", "smtp_user", "smtp_password", "smtp_from", "smtp_to", mode="before")
+    @classmethod
+    def _blank_ok(cls, value: Any) -> Any:
+        if value is None:
+            return ""
+        return value
+
+
 class Settings(BaseModel):
     """Fully resolved StarPulse configuration."""
 
@@ -79,6 +110,7 @@ class Settings(BaseModel):
     database: DatabaseSettings = DatabaseSettings()
     starlink: StarlinkSettings = StarlinkSettings()
     weather: WeatherSettings = WeatherSettings()
+    notifications: NotificationsSettings = NotificationsSettings()
 
 
 def _deep_merge(base: dict[str, Any], override: Mapping[str, Any]) -> dict[str, Any]:
@@ -158,4 +190,5 @@ def load_settings(
         database=DatabaseSettings(**merged["database"]),
         starlink=StarlinkSettings(**merged["starlink"]),
         weather=WeatherSettings(**merged.get("weather", {})),
+        notifications=NotificationsSettings(**merged.get("notifications", {})),
     )

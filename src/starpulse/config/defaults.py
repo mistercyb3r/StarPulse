@@ -36,6 +36,21 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "longitude": "",
         "cache_seconds": 600.0,
     },
+    "notifications": {
+        "enabled": False,
+        "smtp_host": "",
+        "smtp_port": 587,
+        "smtp_user": "",
+        "smtp_password": "",
+        "smtp_from": "",
+        "smtp_to": "",
+        "smtp_use_tls": True,
+        "cooldown_seconds": 900.0,
+        "latency_warn_ms": 100.0,
+        "packet_loss_warn": 0.1,
+        "obstruction_warn_percent": 5.0,
+        "health_warn_score": 50.0,
+    },
 }
 
 DEFAULT_CONFIG_TOML = """\
@@ -85,4 +100,24 @@ latitude = ""
 longitude = ""
 # How long (in seconds) to cache weather API responses before refreshing.
 cache_seconds = 600
+
+[notifications]
+# Email alerts for Starlink offline/recovered and performance warnings.
+# Disabled by default — configure SMTP and set enabled = true to turn on.
+enabled = false
+smtp_host = ""
+smtp_port = 587
+smtp_user = ""
+smtp_password = ""
+# From/To addresses. Leave smtp_from blank to use smtp_user.
+smtp_from = ""
+smtp_to = ""
+smtp_use_tls = true
+# Minimum seconds between emails of the same event type (spam protection).
+cooldown_seconds = 900
+# Thresholds for performance/health warnings.
+latency_warn_ms = 100
+packet_loss_warn = 0.1
+obstruction_warn_percent = 5.0
+health_warn_score = 50
 """

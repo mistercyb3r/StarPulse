@@ -19,6 +19,7 @@ from starpulse.db.session import Database
 from starpulse.logging_config import configure_logging, get_logger
 from starpulse.services.geocoding import BigDataCloudPlaceNameResolver, PlaceNameResolver
 from starpulse.services.geoip import BigDataCloudGeoIpProvider, GeoIpProvider
+from starpulse.services.notifications import NotificationService
 from starpulse.services.weather import CachedWeatherProvider, OpenMeteoWeatherClient, WeatherClient
 from starpulse.services.weather_sampler import WeatherSampler
 
@@ -72,12 +73,14 @@ def create_app(
         (lambda _host, _port: starlink_client) if starlink_client is not None else GrpcStarlinkClient
     )
     client = client_factory(settings.starlink.dish_host, settings.starlink.dish_port)
-    outage_tracker = OutageTracker(database)
+    notifications = NotificationService(database, settings)
+    outage_tracker = OutageTracker(database, notifications=notifications)
     collector = StarlinkPoller(
         client,
         database,
         settings.starlink.poll_interval_seconds,
         outage_tracker=outage_tracker,
+        notifications=notifications,
     )
     weather_provider = CachedWeatherProvider(
         weather_client or OpenMeteoWeatherClient(),
@@ -122,6 +125,7 @@ def create_app(
     app.state.settings = settings
     app.state.db = database
     app.state.collector = collector
+    app.state.notifications = notifications
     app.state.starlink_client_factory = client_factory
     app.state.weather_provider = weather_provider
     app.state.weather_sampler = weather_sampler

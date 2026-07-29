@@ -31,7 +31,7 @@ export function StarlinkHealthCard({ health }: StarlinkHealthCardProps) {
 
       <div className="health-card__body">
         <div className="health-card__heading">
-          <span className="health-card__label">Starlink Health</span>
+          <span className="health-card__label">🛰️ Starlink Health</span>
           <span className={`health-card__quality health-card__quality--${tone}`}>{health?.quality_label ?? "Unknown"}</span>
         </div>
 

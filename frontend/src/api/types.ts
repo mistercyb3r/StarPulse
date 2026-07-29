@@ -248,3 +248,80 @@ export interface SetupResponse {
   restart_required: boolean;
   message: string;
 }
+
+export interface NotificationSettingsResponse {
+  enabled: boolean;
+  smtp_host: string;
+  smtp_port: number;
+  smtp_user: string;
+  smtp_password_set: boolean;
+  smtp_from: string;
+  smtp_to: string;
+  smtp_use_tls: boolean;
+  cooldown_seconds: number;
+  latency_warn_ms: number;
+  packet_loss_warn: number;
+  obstruction_warn_percent: number;
+  health_warn_score: number;
+  smtp_configured: boolean;
+}
+
+export interface NotificationSettingsUpdate {
+  enabled?: boolean;
+  smtp_host?: string;
+  smtp_port?: number;
+  smtp_user?: string;
+  smtp_password?: string;
+  smtp_from?: string;
+  smtp_to?: string;
+  smtp_use_tls?: boolean;
+  cooldown_seconds?: number;
+  latency_warn_ms?: number;
+  packet_loss_warn?: number;
+  obstruction_warn_percent?: number;
+  health_warn_score?: number;
+}
+
+export interface NotificationSettingsActionResponse {
+  ok: boolean;
+  message: string;
+  settings: NotificationSettingsResponse;
+}
+
+export interface NotificationTestResponse {
+  ok: boolean;
+  status: string;
+  message: string;
+  event_id: number | null;
+}
+
+export interface NotificationHistoryItem {
+  id: number;
+  timestamp: string;
+  event_type: string;
+  channel: string;
+  subject: string;
+  body: string;
+  status: string;
+  error_message: string | null;
+}
+
+export interface NotificationHistoryResponse {
+  events: NotificationHistoryItem[];
+  count: number;
+}
+
+export interface AboutResponse {
+  name: string;
+  version: string;
+  description: string;
+  github_url: string;
+  uptime_seconds: number;
+  setup_complete: boolean;
+  starlink_connected: boolean | null;
+  database_path: string;
+  data_dir: string;
+  python_version: string;
+  platform: string;
+  credits: string[];
+}

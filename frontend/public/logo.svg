@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="StarPulse">
+  <defs>
+    <linearGradient id="sp-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#122033"/>
+      <stop offset="100%" stop-color="#0b0f14"/>
+    </linearGradient>
+    <linearGradient id="sp-ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#5eb3ff"/>
+      <stop offset="100%" stop-color="#3b9dff"/>
+    </linearGradient>
+    <linearGradient id="sp-pulse" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#3b9dff"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#sp-bg)"/>
+  <circle cx="64" cy="64" r="42" fill="none" stroke="url(#sp-ring)" stroke-width="6" opacity="0.95"/>
+  <circle cx="64" cy="64" r="28" fill="none" stroke="#3b9dff" stroke-width="3" opacity="0.35"/>
+  <path d="M64 28 L70 54 L96 64 L70 74 L64 100 L58 74 L32 64 L58 54 Z" fill="#e7edf3"/>
+  <circle cx="64" cy="64" r="8" fill="url(#sp-pulse)"/>
+  <path d="M18 64 H34 M94 64 H110" stroke="url(#sp-pulse)" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+</svg>

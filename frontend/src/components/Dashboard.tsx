@@ -1,5 +1,6 @@
 import { useStarlinkTelemetry } from "../hooks/useStarlinkTelemetry";
 import { formatBps, formatMs, formatPercent, formatRelativeTime } from "../utils/format";
+import { BrandMark, Tooltip } from "./BrandMark";
 import { ConnectionIndicator } from "./ConnectionIndicator";
 import { ConnectionTimeline } from "./charts/ConnectionTimeline";
 import { LatencyHistoryChart } from "./charts/LatencyHistoryChart";
@@ -29,11 +30,20 @@ function toneForThreshold(value: number | null | undefined, warnAt: number, badA
 }
 
 interface DashboardProps {
+  appVersion?: string;
   onOpenWeatherImpact?: () => void;
   onOpenLocationSettings?: () => void;
+  onOpenNotifications?: () => void;
+  onOpenAbout?: () => void;
 }
 
-export function Dashboard({ onOpenWeatherImpact, onOpenLocationSettings }: DashboardProps) {
+export function Dashboard({
+  appVersion = "1.0.0",
+  onOpenWeatherImpact,
+  onOpenLocationSettings,
+  onOpenNotifications,
+  onOpenAbout,
+}: DashboardProps) {
   const {
     status,
     history,
@@ -61,23 +71,44 @@ export function Dashboard({ onOpenWeatherImpact, onOpenLocationSettings }: Dashb
   return (
     <div className="dashboard">
       <header className="dashboard__header">
-        <div>
-          <h1 className="dashboard__title">StarPulse</h1>
-          <p className="dashboard__subtitle">Local Starlink telemetry dashboard</p>
+        <div className="dashboard__brand">
+          <BrandMark size={40} version={appVersion} />
+          <p className="dashboard__subtitle">Self-hosted Starlink monitoring</p>
         </div>
         <div className="dashboard__header-meta">
-          <ConnectionIndicator label={isUsingMockData ? "Backend Offline" : "Backend Online"} tone={isUsingMockData ? "bad" : "good"} />
+          <Tooltip text="Whether the StarPulse API is reachable from this browser">
+            <ConnectionIndicator
+              label={isUsingMockData ? "Backend Offline" : "Backend Online"}
+              tone={isUsingMockData ? "bad" : "good"}
+            />
+          </Tooltip>
           {status && <StatusBadge state={status.connection_state} />}
-          {health?.starlink_connected === false && <ConnectionIndicator label="Dish Unreachable" tone="bad" />}
-          <span className="dashboard__updated">Updated {formatRelativeTime(lastUpdated?.toISOString() ?? null)}</span>
+          {health?.starlink_connected === false && (
+            <Tooltip text="The collector could not reach the dish on the last poll">
+              <ConnectionIndicator label="Dish Unreachable" tone="bad" />
+            </Tooltip>
+          )}
+          <span className="dashboard__updated" title="Last successful dashboard refresh">
+            Updated {formatRelativeTime(lastUpdated?.toISOString() ?? null)}
+          </span>
           {onOpenWeatherImpact && (
             <button type="button" className="dashboard__nav-link" onClick={onOpenWeatherImpact}>
-              Weather Impact
+              🌦️ Weather Impact
             </button>
           )}
           {onOpenLocationSettings && (
             <button type="button" className="dashboard__nav-link" onClick={onOpenLocationSettings}>
-              Location
+              📍 Location
+            </button>
+          )}
+          {onOpenNotifications && (
+            <button type="button" className="dashboard__nav-link" onClick={onOpenNotifications}>
+              🚨 Alerts
+            </button>
+          )}
+          {onOpenAbout && (
+            <button type="button" className="dashboard__nav-link" onClick={onOpenAbout}>
+              About
             </button>
           )}
           <InstallPwaButton />
@@ -89,19 +120,21 @@ export function Dashboard({ onOpenWeatherImpact, onOpenLocationSettings }: Dashb
       <StarlinkHealthCard health={starlinkHealth} />
 
       <section className="dashboard__metrics">
-        <MetricCard label="Download" value={formatBps(status?.download_bps)} sublabel="current" />
-        <MetricCard label="Upload" value={formatBps(status?.upload_bps)} sublabel="current" />
+        <MetricCard label="Download" value={formatBps(status?.download_bps)} sublabel="current" icon="⬇️" />
+        <MetricCard label="Upload" value={formatBps(status?.upload_bps)} sublabel="current" icon="⬆️" />
         <MetricCard
           label="Latency"
           value={formatMs(status?.latency_ms)}
           sublabel="current"
           tone={toneForThreshold(status?.latency_ms, 50, 100)}
+          icon="📶"
         />
         <MetricCard
           label="Obstruction"
           value={formatPercent(status?.obstruction_percent)}
           sublabel="current"
           tone={toneForThreshold(status?.obstruction_percent, 1, 5)}
+          icon="🛰️"
         />
       </section>
 
@@ -126,7 +159,8 @@ export function Dashboard({ onOpenWeatherImpact, onOpenLocationSettings }: Dashb
       <DishInfoCard info={dishInfo} />
 
       <footer className="dashboard__footer">
-        StarPulse is a local, self-hosted dashboard — no accounts, no cloud, data never leaves your network.
+        <div className="dashboard__footer-brand">StarPulse v{appVersion}</div>
+        <div>Self-hosted Starlink monitoring — no accounts, no cloud, data stays on your network.</div>
       </footer>
     </div>
   );

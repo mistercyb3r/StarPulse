@@ -10,16 +10,17 @@ a small local web server backed by SQLite, configured with a plain text
 file (or a first-run setup page), and designed to be extended with
 plugins/modules over time.
 
-> **Status:** backend + Starlink collector + read API + web dashboard +
-> power/latency/weather/outage insights + installable PWA + first-run
-> setup + Docker packaging. See [Roadmap](#roadmap) for what's still
-> missing (auth, retention policies, write/control endpoints).
+> **Status:** StarPulse **v1.0** — FastAPI + React + SQLite + Docker, with
+> Starlink collector, weather impact, location settings, email alerts,
+> branded PWA dashboard, and first-run setup. See
+> [docs/RELEASE_NOTES_v1.0.md](docs/RELEASE_NOTES_v1.0.md) and
+> [Roadmap](#roadmap) for what's still out of scope (auth, retention,
+> write/control endpoints, non-email notification channels).
 
 ## Screenshots
 
-> _Add screenshots here once you have a dish to point StarPulse at —
-> `docs/screenshots/dashboard.png` and `docs/screenshots/setup.png` are
-> good default paths to drop them in._
+> Add real captures under `docs/screenshots/` when you have a dish online.
+> Placeholder notes live in [`docs/screenshots/README.md`](docs/screenshots/README.md).
 
 | Setup wizard | Dashboard |
 | --- | --- |
@@ -132,7 +133,7 @@ This builds and runs the backend and frontend as two containers, with
 one persistent volume for the database/config/logs.
 
 ```bash
-git clone https://github.com/<you>/StarPulse.git
+git clone https://github.com/mistercyb3r/StarPulse.git
 cd StarPulse
 cp .env.example .env   # optional — only needed to change default ports
 
@@ -206,10 +207,10 @@ you restart the process (`docker compose restart backend`, or re-run
 and lets you continue to the dashboard on the current port in the
 meantime.
 
-You can revisit these settings anytime by calling `POST /api/setup`
-again (there's no dedicated "settings" page in the UI yet — see
-[Roadmap](#roadmap)), or by editing `config.toml` directly and
-restarting.
+You can revisit dish/port settings anytime via `POST /api/setup` or by
+editing `config.toml` and restarting. Location, weather coordinates, and
+**email alert** settings are available from the dashboard (**Location**,
+**Alerts**). See [Roadmap](#roadmap) for remaining gaps.
 
 ## Starlink telemetry collection
 
@@ -553,6 +554,11 @@ What it shows:
 - **Weather vs Performance** view (nav from the dashboard) — 24h / 7d /
   30d charts correlating rain/precip probability with speed and latency,
   plus outage bands from `/api/weather/history`.
+- **Email Alerts** — SMTP configuration, enable/disable, test email,
+  cooldown, and notification history (`/api/notifications/*`).
+- **About** — version, GitHub link, system information, and credits
+  (`/api/about`).
+- Branded header logo + version, connection status, and footer tagline.
 
 It polls `/api/health`, `/api/starlink/status`, `/api/starlink/history`,
 `/api/starlink/health`, `/api/starlink/dish-info`,
@@ -610,12 +616,27 @@ ordering issues against a backend that isn't ready yet) and for
 - **Ports:** backend on `STARPULSE_PORT` (default `8000`), frontend/
   dashboard on `STARPULSE_WEB_PORT` (default `8080`) — both configurable
   via `.env` (copy from `.env.example`).
-- **Updating:** `docker compose pull` (if you're using published images)
-  or `docker compose up -d --build` (rebuild locally) after pulling new
-  source. Your data volume is untouched by rebuilds.
-- **Backing up:** the whole `starpulse-data` volume is what to back up —
-  e.g. `docker run --rm -v starpulse-data:/data -v "$PWD":/backup alpine
-  tar czf /backup/starpulse-backup.tgz -C /data .`
+- **Updating:** pull latest source, then rebuild without touching data:
+
+  ```bash
+  git pull
+  docker compose up -d --build
+  ```
+
+  Your `starpulse-data` volume is untouched by rebuilds. If you're using
+  published images instead: `docker compose pull && docker compose up -d`.
+- **Backing up:** back up the whole `starpulse-data` volume (config,
+  SQLite DB, logs). Example:
+
+  ```bash
+  docker run --rm -v starpulse-data:/data -v "$PWD":/backup alpine \
+    tar czf /backup/starpulse-backup.tgz -C /data .
+  ```
+
+  Local (non-Docker) installs: copy your `STARPULSE_DATA_DIR` folder
+  (default `./data`), especially `config.toml` and `starpulse.db`.
+- **Restoring:** stop the stack, extract the archive into the volume /
+  data directory, then `docker compose up -d` again.
 
 ## Configuration
 
@@ -642,6 +663,14 @@ Settings are resolved in this order (highest priority first):
 | Weather latitude | `[weather] latitude` | `STARPULSE_WEATHER_LATITUDE` | *(unset)* |
 | Weather longitude | `[weather] longitude` | `STARPULSE_WEATHER_LONGITUDE` | *(unset)* |
 | Weather cache TTL (seconds) | `[weather] cache_seconds` | — | `600` |
+| Notifications enabled | `[notifications] enabled` | `STARPULSE_NOTIFICATIONS_ENABLED` | `false` |
+| SMTP host | `[notifications] smtp_host` | `STARPULSE_SMTP_HOST` | *(empty)* |
+| SMTP port | `[notifications] smtp_port` | `STARPULSE_SMTP_PORT` | `587` |
+| SMTP user | `[notifications] smtp_user` | `STARPULSE_SMTP_USER` | *(empty)* |
+| SMTP password | `[notifications] smtp_password` | `STARPULSE_SMTP_PASSWORD` | *(empty)* |
+| SMTP from | `[notifications] smtp_from` | `STARPULSE_SMTP_FROM` | *(empty → use user)* |
+| SMTP to | `[notifications] smtp_to` | `STARPULSE_SMTP_TO` | *(empty)* |
+| SMTP STARTTLS | `[notifications] smtp_use_tls` | `STARPULSE_SMTP_USE_TLS` | `true` |
 
 Environment variables always win, even over values saved by the setup
 wizard — if a value doesn't seem to change after using the wizard,
@@ -712,9 +741,7 @@ moment to come up. If it's still unhealthy after ~30s, check
 This codebase intentionally stops before:
 
 - Authentication of any kind — still assumes a trusted local network
-- A dedicated in-app "settings" page (only the one-time setup wizard;
-  `POST /api/setup` works anytime, but there's no UI entry point to it
-  after first run)
+- Non-email notification channels (Discord, Telegram, SMS, mobile push)
 - Historical data retention/aggregation (downsampling) policies
 - Write/control endpoints (e.g. reboot, stow) — the API is read-only so far
 - Multi-dish support

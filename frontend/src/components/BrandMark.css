@@ -1,0 +1,40 @@
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.brand-mark__logo {
+  width: var(--brand-size, 36px);
+  height: var(--brand-size, 36px);
+  border-radius: 0.55rem;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(59, 157, 255, 0.25);
+}
+
+.brand-mark__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.05rem;
+  line-height: 1.15;
+}
+
+.brand-mark__name {
+  font-family: "Segoe UI Variable Display", "Segoe UI", "Trebuchet MS", sans-serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.brand-mark__version {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sp-tooltip {
+  cursor: help;
+}

@@ -4,10 +4,10 @@
   --bg: #0b0f14;
   --surface: #121820;
   --surface-raised: #1a222c;
-  --border-subtle: #232c37;
+  --border-subtle: #2a3442;
 
   --text: #e7edf3;
-  --text-muted: #8996a5;
+  --text-muted: #8b98a8;
 
   --accent: #3b9dff;
   --accent-2: #34d399;
@@ -30,13 +30,22 @@ body,
 
 body {
   margin: 0;
-  background: var(--bg);
+  background:
+    radial-gradient(1200px 600px at 10% -10%, rgba(59, 157, 255, 0.12), transparent 55%),
+    radial-gradient(900px 500px at 90% 0%, rgba(52, 211, 153, 0.08), transparent 50%),
+    var(--bg);
   color: var(--text);
   font-family:
-    "Inter",
+    "Segoe UI Variable Text",
     "Segoe UI",
-    system-ui,
-    -apple-system,
+    "Trebuchet MS",
     sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }

@@ -19,7 +19,7 @@ function toneForSeverity(severity: string | undefined): Tone {
 export function SignalConditionsCard({ impact }: SignalConditionsCardProps) {
   if (impact === null) {
     return (
-      <ChartCard title="🌐 Signal Conditions" subtitle="Weather impact on Starlink performance">
+      <ChartCard title="📡 Signal" subtitle="Weather impact on Starlink performance">
         <p className="signal-conditions__empty">Loading signal conditions…</p>
       </ChartCard>
     );
@@ -27,7 +27,7 @@ export function SignalConditionsCard({ impact }: SignalConditionsCardProps) {
 
   if (!impact.available) {
     return (
-      <ChartCard title="🌐 Signal Conditions" subtitle="Weather impact on Starlink performance">
+      <ChartCard title="📡 Signal" subtitle="Weather impact on Starlink performance">
         <p className="signal-conditions__empty">{impact.message ?? "Signal conditions unavailable"}</p>
       </ChartCard>
     );
@@ -36,7 +36,7 @@ export function SignalConditionsCard({ impact }: SignalConditionsCardProps) {
   const tone = toneForSeverity(impact.severity);
 
   return (
-    <ChartCard title="🌐 Signal Conditions" subtitle="Weather impact on Starlink performance">
+    <ChartCard title="📡 Signal" subtitle="Weather impact on Starlink performance">
       <div className="signal-conditions">
         <div className="signal-conditions__impact">
           <span className="signal-conditions__label">Weather impact</span>

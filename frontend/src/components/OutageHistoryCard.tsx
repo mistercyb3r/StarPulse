@@ -16,7 +16,7 @@ export function OutageHistoryCard({ outages }: OutageHistoryCardProps) {
 
   return (
     <InfoCard
-      title="📡 Connection History"
+      title="🚨 Alerts"
       subtitle="Outages and degraded-connection events, last 7 days"
       rows={[
         { label: "Today", value: outages ? pluralize(outages.outages_today, "outage") : "—" },

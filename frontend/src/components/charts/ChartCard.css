@@ -1,23 +1,25 @@
 .chart-card {
-  background: var(--surface);
+  background: linear-gradient(180deg, rgba(26, 34, 44, 0.55), rgba(18, 24, 32, 0.95));
   border: 1px solid var(--border-subtle);
-  border-radius: 0.9rem;
-  padding: 1.25rem;
+  border-radius: 0.95rem;
+  padding: 1.25rem 1.3rem;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
 }
 
 .chart-card__header {
-  margin-bottom: 0.75rem;
+  margin-bottom: 0.85rem;
 }
 
 .chart-card__title {
   margin: 0;
   font-size: 1rem;
-  font-weight: 600;
+  font-weight: 650;
   color: var(--text);
+  letter-spacing: -0.01em;
 }
 
 .chart-card__subtitle {
-  margin: 0.15rem 0 0;
+  margin: 0.2rem 0 0;
   font-size: 0.8rem;
   color: var(--text-muted);
 }

@@ -23,7 +23,7 @@ export function PerformanceStats({ performance, period, onPeriodChange }: Perfor
   return (
     <section className="performance-stats">
       <div className="performance-stats__header">
-        <h3 className="performance-stats__title">Performance Statistics</h3>
+        <h3 className="performance-stats__title">📈 Performance</h3>
         <div className="performance-stats__periods" role="tablist" aria-label="Performance period">
           {PERIODS.map((value) => (
             <button

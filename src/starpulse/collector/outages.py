@@ -13,12 +13,18 @@ Kept separate from ``repository`` (pure persistence) and ``poller``
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
+from typing import TYPE_CHECKING, Optional
 
 from starpulse.collector import repository
 from starpulse.collector.client import StarlinkSample
+from starpulse.db.models import ConnectionEvent
 from starpulse.db.session import Database
 from starpulse.logging_config import get_logger
+
+if TYPE_CHECKING:
+    from starpulse.services.notifications import NotificationService
 
 logger = get_logger(__name__)
 
@@ -32,6 +38,14 @@ HIGH_PACKET_LOSS_THRESHOLD = 0.5
 REASON_DISCONNECTED = "disconnected"
 REASON_HIGH_PACKET_LOSS = "high_packet_loss"
 REASON_DISH_UNAVAILABLE = "dish_unavailable"
+
+
+@dataclass(frozen=True)
+class OutageTransition:
+    """What changed for the open connection event on this poll tick."""
+
+    opened: ConnectionEvent | None = None
+    closed: ConnectionEvent | None = None
 
 
 def classify_sample(sample: StarlinkSample) -> str | None:
@@ -51,25 +65,54 @@ class OutageTracker:
     from any thread without session-lifetime coupling to the caller.
     """
 
-    def __init__(self, database: Database) -> None:
+    def __init__(
+        self,
+        database: Database,
+        notifications: Optional["NotificationService"] = None,
+    ) -> None:
         self._database = database
+        self._notifications = notifications
 
-    def record_success(self, sample: StarlinkSample) -> None:
+    def record_success(self, sample: StarlinkSample) -> OutageTransition:
         """Update outage tracking after a successful poll (a stored sample)."""
         reason = classify_sample(sample)
         session = next(self._database.get_session())
         try:
             if reason is None:
-                repository.close_open_connection_event(session, end_time=sample.timestamp)
+                closed = repository.close_open_connection_event(session, end_time=sample.timestamp)
+                transition = OutageTransition(closed=closed)
             else:
-                repository.upsert_open_connection_event(session, at=sample.timestamp, reason=reason)
+                already_open = repository.get_open_connection_event(session) is not None
+                opened = repository.upsert_open_connection_event(session, at=sample.timestamp, reason=reason)
+                transition = OutageTransition(opened=None if already_open else opened)
         finally:
             session.close()
 
-    def record_failure(self, at: datetime) -> None:
+        self._emit(transition, sample)
+        return transition
+
+    def record_failure(self, at: datetime) -> OutageTransition:
         """Update outage tracking after a failed poll (the dish itself was unreachable)."""
         session = next(self._database.get_session())
         try:
-            repository.upsert_open_connection_event(session, at=at, reason=REASON_DISH_UNAVAILABLE)
+            already_open = repository.get_open_connection_event(session) is not None
+            opened = repository.upsert_open_connection_event(session, at=at, reason=REASON_DISH_UNAVAILABLE)
+            transition = OutageTransition(opened=None if already_open else opened)
         finally:
             session.close()
+
+        self._emit(transition, sample=None)
+        if self._notifications is not None and transition.opened is not None:
+            self._notifications.on_dish_unavailable(at)
+        return transition
+
+    def _emit(self, transition: OutageTransition, sample: StarlinkSample | None) -> None:
+        if self._notifications is None:
+            return
+        try:
+            if transition.opened is not None:
+                self._notifications.on_outage_opened(transition.opened, sample)
+            if transition.closed is not None:
+                self._notifications.on_outage_closed(transition.closed, sample)
+        except Exception:
+            logger.exception("Notification dispatch failed after outage transition")

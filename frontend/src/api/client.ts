@@ -1,10 +1,16 @@
 import type {
+  AboutResponse,
   DishInfoResponse,
   HealthResponse,
   LocationActionResponse,
   LocationResponse,
   LocationSettingsResponse,
   ManualLocationRequest,
+  NotificationHistoryResponse,
+  NotificationSettingsActionResponse,
+  NotificationSettingsResponse,
+  NotificationSettingsUpdate,
+  NotificationTestResponse,
   OutageSummaryResponse,
   SetupRequest,
   SetupResponse,
@@ -196,4 +202,26 @@ export function getWeatherImpact(): Promise<WeatherImpactResponse> {
 
 export function getWeatherHistory(period: WeatherHistoryPeriod = "24h"): Promise<WeatherHistoryResponse> {
   return getJson<WeatherHistoryResponse>("/api/weather/history", { period });
+}
+
+export function getNotificationSettings(): Promise<NotificationSettingsResponse> {
+  return getJson<NotificationSettingsResponse>("/api/notifications/settings");
+}
+
+export function saveNotificationSettings(
+  payload: NotificationSettingsUpdate,
+): Promise<NotificationSettingsActionResponse> {
+  return postJson<NotificationSettingsActionResponse>("/api/notifications/settings", payload);
+}
+
+export function testNotificationEmail(): Promise<NotificationTestResponse> {
+  return postJson<NotificationTestResponse>("/api/notifications/test", {});
+}
+
+export function getNotificationHistory(limit = 50): Promise<NotificationHistoryResponse> {
+  return getJson<NotificationHistoryResponse>("/api/notifications/history", { limit });
+}
+
+export function getAbout(): Promise<AboutResponse> {
+  return getJson<AboutResponse>("/api/about");
 }

@@ -17,12 +17,12 @@ function isLocationRequired(message: string | null | undefined): boolean {
 
 export function WeatherCard({ weather, onSetupLocation }: WeatherCardProps) {
   if (weather === null) {
-    return <InfoCard title="🌦 Weather" rows={[]} unavailableMessage="Loading weather…" />;
+    return <InfoCard title="🌦️ Weather" rows={[]} unavailableMessage="Loading weather…" />;
   }
 
   if (!weather.available && isLocationRequired(weather.message)) {
     return (
-      <ChartCard title="🌦 Weather">
+      <ChartCard title="🌦️ Weather">
         <p className="weather-card__empty">No location configured.</p>
         {onSetupLocation && (
           <div className="weather-card__actions">
@@ -39,7 +39,7 @@ export function WeatherCard({ weather, onSetupLocation }: WeatherCardProps) {
   }
 
   if (!weather.available) {
-    return <InfoCard title="🌦 Weather" rows={[]} unavailableMessage={weather.message ?? "Weather is unavailable"} />;
+    return <InfoCard title="🌦️ Weather" rows={[]} unavailableMessage={weather.message ?? "Weather is unavailable"} />;
   }
 
   const locationLabel =
@@ -53,7 +53,7 @@ export function WeatherCard({ weather, onSetupLocation }: WeatherCardProps) {
 
   return (
     <InfoCard
-      title="🌦 Weather"
+      title="🌦️ Weather"
       subtitle={weather.conditions ? `${weather.conditions} · ${locationLabel}` : locationLabel}
       rows={[
         { label: "Temperature", value: formatTemperature(weather.temperature_c) },

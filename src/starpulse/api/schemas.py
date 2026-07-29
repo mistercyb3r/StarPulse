@@ -305,3 +305,81 @@ class SetupResponse(BaseModel):
     setup_complete: bool
     restart_required: bool
     message: str
+
+class NotificationSettingsResponse(BaseModel):
+    enabled: bool
+    smtp_host: str
+    smtp_port: int
+    smtp_user: str
+    smtp_password_set: bool
+    smtp_from: str
+    smtp_to: str
+    smtp_use_tls: bool
+    cooldown_seconds: float
+    latency_warn_ms: float
+    packet_loss_warn: float
+    obstruction_warn_percent: float
+    health_warn_score: float
+    smtp_configured: bool
+
+
+class NotificationSettingsUpdate(BaseModel):
+    enabled: bool | None = None
+    smtp_host: str | None = None
+    smtp_port: int | None = Field(default=None, ge=1, le=65535)
+    smtp_user: str | None = None
+    # Omit or send empty string to leave the stored password unchanged.
+    smtp_password: str | None = None
+    smtp_from: str | None = None
+    smtp_to: str | None = None
+    smtp_use_tls: bool | None = None
+    cooldown_seconds: float | None = Field(default=None, ge=0, le=86400)
+    latency_warn_ms: float | None = Field(default=None, gt=0)
+    packet_loss_warn: float | None = Field(default=None, ge=0, le=1)
+    obstruction_warn_percent: float | None = Field(default=None, ge=0, le=100)
+    health_warn_score: float | None = Field(default=None, ge=0, le=100)
+
+
+class NotificationSettingsActionResponse(BaseModel):
+    ok: bool
+    message: str
+    settings: NotificationSettingsResponse
+
+
+class NotificationTestResponse(BaseModel):
+    ok: bool
+    status: str
+    message: str
+    event_id: int | None = None
+
+
+class NotificationHistoryItem(BaseModel):
+    id: int
+    timestamp: datetime
+    event_type: str
+    channel: str
+    subject: str
+    body: str
+    status: str
+    error_message: str | None = None
+
+
+class NotificationHistoryResponse(BaseModel):
+    events: list[NotificationHistoryItem]
+    count: int
+
+
+class AboutResponse(BaseModel):
+    name: str = "StarPulse"
+    version: str
+    description: str
+    github_url: str
+    uptime_seconds: float
+    setup_complete: bool
+    starlink_connected: bool | None = None
+    database_path: str
+    data_dir: str
+    python_version: str
+    platform: str
+    credits: list[str]
+

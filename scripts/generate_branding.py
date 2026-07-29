@@ -97,14 +97,23 @@ def make_logo_png(path: Path) -> None:
     _fill_rounded_rect(draw, (0, 0, w - 1, h - 1), 48, BG)
 
     icon_size = 220
-    icon = _draw_icon_tile(icon_size)
-    icon_x, icon_y = 40, (h - icon_size) // 2
-    img.alpha_composite(icon, (icon_x, icon_y))
-
+    gap = 56
     font = _font(120, bold=True)
     text = "StarPulse"
-    tx = icon_x + icon_size + 48
-    ty = (h - 120) // 2 - 8
+    # Ink bbox (not em-box): FreeType "middle" anchors sit a few px low for this face
+    tb = draw.textbbox((0, 0), text, font=font)
+    text_w = tb[2] - tb[0]
+    lockup_w = icon_size + gap + text_w
+    icon_x = max(40, (w - lockup_w) // 2)
+    icon_y = (h - icon_size) // 2
+    icon_cy = icon_y + icon_size / 2
+
+    icon = _draw_icon_tile(icon_size)
+    img.alpha_composite(icon, (icon_x, icon_y))
+
+    # Place so the wordmark ink is optically centered on the icon mid-line
+    tx = icon_x + icon_size + gap
+    ty = icon_cy - (tb[1] + tb[3]) / 2
     draw.text((tx, ty), text, font=font, fill=TEXT)
 
     img.save(path, "PNG")
@@ -128,14 +137,20 @@ def make_social_preview(path: Path) -> None:
     draw.rectangle((0, 0, w, 4), fill=RING)
 
     icon = _draw_icon_tile(160)
-    img.alpha_composite(icon, (80, 120))
+    icon_x, icon_y = 80, 120
+    img.alpha_composite(icon, (icon_x, icon_y))
+    icon_cy = icon_y + 160 / 2
 
     title_font = _font(92, bold=True)
     subtitle_font = _font(36, bold=False)
     features_font = _font(28, bold=False)
     creator_font = _font(24, bold=False)
 
-    draw.text((280, 130), "StarPulse", font=title_font, fill=TEXT)
+    title = "StarPulse"
+    title_tb = draw.textbbox((0, 0), title, font=title_font)
+    title_x = icon_x + 160 + 40
+    title_y = icon_cy - (title_tb[1] + title_tb[3]) / 2
+    draw.text((title_x, title_y), title, font=title_font, fill=TEXT)
     draw.text((280, 240), "Self-hosted Starlink Monitoring", font=subtitle_font, fill=ACCENT)
     draw.text((280, 310), "Telemetry  •  Weather  •  Alerts  •  Outage Tracking", font=features_font, fill=MUTED)
 

@@ -1,0 +1,33 @@
+.location-card__place {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.location-card__muted {
+  margin: 0.45rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.location-card__setup {
+  margin-top: 0.85rem;
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.4rem 0.85rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+.location-card__setup:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.location-card__setup--subtle {
+  margin-top: 0.75rem;
+}

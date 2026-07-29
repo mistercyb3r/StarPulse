@@ -221,6 +221,49 @@
   font-size: 0.85rem;
 }
 
+.location-settings__weather-status {
+  margin: 0.25rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.location-settings__advanced-toggle {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.location-settings__diagnostics {
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.location-settings__diagnostics > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.85rem;
+}
+
+.location-settings__diagnostics dt {
+  color: var(--text-muted);
+}
+
+.location-settings__diagnostics dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
 .location-settings__card--privacy {
   background: color-mix(in srgb, var(--accent) 6%, var(--surface));
 }

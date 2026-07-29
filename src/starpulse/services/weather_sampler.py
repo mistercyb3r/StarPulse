@@ -34,11 +34,13 @@ class WeatherSampler:
         *,
         interval_seconds: float | None = None,
         enabled: bool | None = None,
+        geoip_provider=None,
     ) -> None:
         self._database = database
         self._settings = settings
         self._collector = collector
         self._provider = provider
+        self._geoip_provider = geoip_provider
         self._interval_seconds = interval_seconds if interval_seconds is not None else settings.weather.cache_seconds
         self._enabled = settings.weather.enabled if enabled is None else enabled
         self._stop_event = threading.Event()
@@ -73,7 +75,13 @@ class WeatherSampler:
             if has_recent_weather_sample(session, within_seconds=self._interval_seconds):
                 return False
 
-            resolved = resolve_weather_location(self._settings, self._collector, session, persist=True)
+            resolved = resolve_weather_location(
+                self._settings,
+                self._collector,
+                session,
+                persist=True,
+                geoip_provider=self._geoip_provider,
+            )
             if resolved is None:
                 logger.debug("Weather sampler skipped: location unavailable")
                 return False

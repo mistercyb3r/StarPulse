@@ -98,7 +98,7 @@ export interface OutageSummaryResponse {
   events: ConnectionEventResponse[];
 }
 
-export type WeatherLocationSource = "dish_gps" | "configured" | "stored" | null;
+export type WeatherLocationSource = "configured" | "geoip" | "dish_gps" | "stored" | null;
 
 export interface LocationResponse {
   available: boolean;
@@ -108,6 +108,8 @@ export interface LocationResponse {
   source: WeatherLocationSource;
   source_label: string | null;
   place_name: string | null;
+  accuracy: string | null;
+  approximate: boolean;
   gps_valid: boolean | null;
   gps_enabled: boolean | null;
   gps_satellites: number | null;
@@ -121,6 +123,10 @@ export interface LocationSettingsResponse {
   active_latitude: number | null;
   active_longitude: number | null;
   place_name: string | null;
+  accuracy: string | null;
+  approximate: boolean;
+  weather_ok: boolean;
+  weather_summary: string | null;
   dish_gps_available: boolean;
   dish_latitude: number | null;
   dish_longitude: number | null;
@@ -128,6 +134,8 @@ export interface LocationSettingsResponse {
   manual_longitude: number | null;
   gps_valid: boolean | null;
   gps_enabled: boolean | null;
+  gps_satellites: number | null;
+  advanced_note: string | null;
   message: string | null;
   privacy_note: string;
 }

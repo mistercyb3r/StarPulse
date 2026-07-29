@@ -55,9 +55,8 @@ class StarlinkSettings(BaseModel):
 
 class WeatherSettings(BaseModel):
     enabled: bool = True
-    # None (from a blank "" in config.toml) means "no manual fallback
-    # configured". Dish GPS coordinates (from location_data, not mere GPS
-    # lock) are preferred when available; otherwise these values are used.
+    # Manual coordinates are highest priority for weather. When blank/None,
+    # StarPulse falls back to approximate GeoIP, then dish GPS if available.
     latitude: float | None = None
     longitude: float | None = None
     cache_seconds: float = 600.0

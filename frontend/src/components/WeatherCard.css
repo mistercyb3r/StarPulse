@@ -1,0 +1,29 @@
+.weather-card__empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+.weather-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-top: 0.9rem;
+}
+
+.weather-card__action {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.4rem 0.85rem;
+  border-radius: 0.5rem;
+  cursor: pointer;
+}
+
+.weather-card__action:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}

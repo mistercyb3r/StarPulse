@@ -382,24 +382,25 @@ without bypassing the cache or hammering Open-Meteo.
 
 Weather lookups resolve coordinates in this order (first match wins):
 
-1. Starlink dish GPS (live poller cache, then latest telemetry sample)
-2. User-configured `[weather] latitude` / `longitude` (config, env, or
-   setup wizard)
-3. Last successfully resolved coordinates stored in `app_meta`
-   (`weather_resolved_*`) for continuity after restart
-4. Otherwise the API reports that coordinates are not collected yet
+1. **Manual coordinates** from `[weather] latitude` / `longitude`
+   (Location Settings, setup wizard, or env)
+2. **Approximate GeoIP** (city-level only; clearly labeled)
+3. **Starlink dish GPS** when location sharing returns real coordinates
+   (advanced fallback — kept internally, not the primary UX)
+4. Last resolved `app_meta` cache for continuity after restart
+5. Otherwise weather reports **Location required**
 
-**Important:** dish GPS *lock* (`gps_ready` / dashboard “GPS Status:
-Locked”) comes from the status RPC and does **not** imply coordinates
-are available. Coordinates require the separate location-sharing RPC
-(`get_location`). If GPS is locked but sharing is off, StarPulse shows
-`Coordinates: Not collected yet` and will not invent a location — set
-`[weather]` lat/lon in setup/config, or enable location sharing on the
-dish.
+Browser geolocation (“Detect my location”) is client-side: it fills the
+form so you can save manual coordinates (priority 1). It is not a
+separate server-side source.
 
-`GET /api/location` returns the resolved coordinates (plus optional
-reverse-geocoded place name), GPS lock state, and altitude when the
-dish provides it.
+Dish GPS *lock* alone never means coordinates are available. That detail
+lives under Location Settings → Advanced diagnostics — not on the main
+dashboard.
+
+`GET /api/location` / `GET /api/location/settings` expose the active
+source, place name, approximate flag, and (on settings) weather
+connected status plus advanced dish diagnostics.
 
 ### Weather Impact severity
 
@@ -441,8 +442,8 @@ Optional weather settings:
 | Setting | config.toml | Environment variable | Default |
 | --- | --- | --- | --- |
 | Enabled | `[weather] enabled` | `STARPULSE_WEATHER_ENABLED` | `true` |
-| Latitude | `[weather] latitude` | `STARPULSE_WEATHER_LATITUDE` | *(unset → dish GPS / stored)* |
-| Longitude | `[weather] longitude` | `STARPULSE_WEATHER_LONGITUDE` | *(unset → dish GPS / stored)* |
+| Latitude | `[weather] latitude` | `STARPULSE_WEATHER_LATITUDE` | *(unset → GeoIP / dish GPS)* |
+| Longitude | `[weather] longitude` | `STARPULSE_WEATHER_LONGITUDE` | *(unset → GeoIP / dish GPS)* |
 | Cache TTL (seconds) | `[weather] cache_seconds` | — | `600` |
 
 **`GET /api/starlink/health`** — a single 0-100 connection health score,
@@ -538,15 +539,14 @@ What it shows:
 - **Dish Information** — model, software version, dish uptime, GPS
   status, satellite count, and pointing (azimuth/elevation), from
   `/api/starlink/dish-info`.
-- **Location card** — place name (when reverse geocode succeeds), source
-  (Starlink GPS / Manual configuration / Last known), and altitude when
-  available. If GPS is locked but coordinates were not shared by the dish:
-  “GPS: Locked” / “Coordinates: Not collected yet”. Open **Location**
-  from the dashboard header for Location Settings (manual lat/lon, test
-  weather lookup, clear saved location). Privacy note: coordinates can
-  stay local without dish location sharing.
+- **Location card** — place name and source (Manual configuration /
+  Approximate IP / Starlink GPS), or “Not configured” with a Setup
+  button. Open **Location** in the header for Location Settings: detect
+  browser location, save/test/clear coordinates, privacy note, and
+  advanced Starlink GPS diagnostics.
 - **Weather card** — temperature, wind, rain %, conditions from
-  `/api/weather`.
+  `/api/weather`. If no location can be resolved: “No location
+  configured” with Detect / Enter manually actions.
 - **Signal Conditions card** — Weather Impact severity (Low / Moderate /
   High), current latency and download speed, plus short reason lines
   from `/api/weather/impact`.

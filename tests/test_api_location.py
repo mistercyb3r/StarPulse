@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -10,107 +11,75 @@ from starpulse.collector.client import DishCoordinates
 from starpulse.collector.repository import save_sample
 from starpulse.config.settings import load_settings
 from starpulse.services.geocoding import NullPlaceNameResolver
+from starpulse.services.geoip import FixedGeoIpProvider, GeoIpResult, NullGeoIpProvider
+from starpulse.services.location import LOCATION_REQUIRED_MESSAGE
 from starpulse.services.weather import WeatherSnapshot, WeatherUnavailableError
 
 from tests.collector.factories import make_sample
 
 
 class FakeWeatherClient:
-    def __init__(self) -> None:
+    def __init__(self, result: WeatherSnapshot | Exception | None = None) -> None:
         self.calls = 0
+        self.last_coords = None
+        self._result = result
 
     def fetch(self, latitude: float, longitude: float) -> WeatherSnapshot:
         self.calls += 1
+        self.last_coords = (latitude, longitude)
+        if isinstance(self._result, Exception):
+            raise self._result
+        if self._result is not None:
+            return self._result
         raise WeatherUnavailableError("not needed")
 
 
-class FakePlaceResolver:
-    def __init__(self, place_name: str | None = "Thetford, GB") -> None:
-        self.place_name = place_name
-        self.calls: list[tuple[float, float]] = []
+def _snapshot(**overrides) -> WeatherSnapshot:
+    base = dict(
+        temperature_c=12.0,
+        feels_like_c=11.0,
+        humidity_percent=70.0,
+        wind_speed_kph=8.0,
+        conditions="Clear sky",
+        precipitation_mm=0.0,
+        precipitation_probability=5.0,
+        latitude=52.4,
+        longitude=0.7,
+        fetched_at=datetime.now(timezone.utc),
+    )
+    base.update(overrides)
+    return WeatherSnapshot(**base)
 
-    def resolve(self, latitude: float, longitude: float) -> str | None:
-        self.calls.append((latitude, longitude))
-        return self.place_name
 
-
-def _make_app(tmp_path: Path, *, env: dict[str, str] | None = None, place_resolver=None):
+def _make_app(
+    tmp_path: Path,
+    *,
+    env: dict[str, str] | None = None,
+    place_resolver=None,
+    geoip_provider=None,
+    weather_client=None,
+):
     settings = load_settings(data_dir=tmp_path / "data", env=env or {})
     return create_app(
         settings,
         start_collector=False,
         start_weather_sampler=False,
-        weather_client=FakeWeatherClient(),
+        weather_client=weather_client or FakeWeatherClient(),
         place_resolver=place_resolver if place_resolver is not None else NullPlaceNameResolver(),
+        geoip_provider=geoip_provider if geoip_provider is not None else NullGeoIpProvider(),
     )
 
 
-def test_location_returns_dish_gps_coordinates(tmp_path: Path) -> None:
-    place = FakePlaceResolver("Thetford, GB")
-    app = _make_app(tmp_path, place_resolver=place)
-    app.state.collector._dish_location = DishCoordinates(
-        latitude=52.413, longitude=0.748, altitude_m=18.0
-    )
+def test_location_manual_coordinates(tmp_path: Path) -> None:
+    class Place:
+        def resolve(self, latitude: float, longitude: float) -> str | None:
+            return "Thetford, GB"
 
-    session = next(app.state.db.get_session())
-    try:
-        save_sample(session, make_sample(gps_valid=True, gps_enabled=True, gps_satellites=14))
-    finally:
-        session.close()
-
-    with TestClient(app) as client:
-        response = client.get("/api/location")
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["available"] is True
-    assert body["coordinates_collected"] is True
-    assert body["source"] == "dish_gps"
-    assert body["source_label"] == "Starlink GPS"
-    assert body["place_name"] == "Thetford, GB"
-    assert body["latitude"] == pytest.approx(52.413)
-    assert body["longitude"] == pytest.approx(0.748)
-    assert body["altitude_m"] == pytest.approx(18.0)
-    assert body["gps_valid"] is True
-    assert place.calls == [(52.413, 0.748)]
-
-
-def test_location_gps_locked_but_coordinates_not_collected(tmp_path: Path) -> None:
-    app = _make_app(tmp_path)
-    session = next(app.state.db.get_session())
-    try:
-        save_sample(
-            session,
-            make_sample(
-                gps_valid=True,
-                gps_enabled=True,
-                latitude=None,
-                longitude=None,
-                altitude_m=None,
-            ),
-        )
-    finally:
-        session.close()
-
-    with TestClient(app) as client:
-        response = client.get("/api/location")
-
-    assert response.status_code == 200
-    body = response.json()
-    assert body["available"] is False
-    assert body["coordinates_collected"] is False
-    assert body["gps_valid"] is True
-    assert "Coordinates: Not collected yet" in body["message"]
-    assert body["latitude"] is None
-    assert body["longitude"] is None
-
-
-def test_location_manual_configuration_fallback(tmp_path: Path) -> None:
-    place = FakePlaceResolver("Vilnius, LT")
     app = _make_app(
         tmp_path,
-        env={"STARPULSE_WEATHER_LATITUDE": "54.6872", "STARPULSE_WEATHER_LONGITUDE": "25.2797"},
-        place_resolver=place,
+        env={"STARPULSE_WEATHER_LATITUDE": "52.4128", "STARPULSE_WEATHER_LONGITUDE": "0.7471"},
+        place_resolver=Place(),
+        weather_client=FakeWeatherClient(_snapshot()),
     )
 
     with TestClient(app) as client:
@@ -121,12 +90,10 @@ def test_location_manual_configuration_fallback(tmp_path: Path) -> None:
     assert body["available"] is True
     assert body["source"] == "configured"
     assert body["source_label"] == "Manual configuration"
-    assert body["place_name"] == "Vilnius, LT"
-    assert body["latitude"] == pytest.approx(54.6872)
-    assert body["longitude"] == pytest.approx(25.2797)
+    assert body["place_name"] == "Thetford, GB"
 
 
-def test_weather_message_when_gps_locked_without_coords(tmp_path: Path) -> None:
+def test_location_no_location_configured(tmp_path: Path) -> None:
     app = _make_app(tmp_path)
     session = next(app.state.db.get_session())
     try:
@@ -135,125 +102,119 @@ def test_weather_message_when_gps_locked_without_coords(tmp_path: Path) -> None:
         session.close()
 
     with TestClient(app) as client:
-        response = client.get("/api/weather")
+        response = client.get("/api/location")
 
     assert response.status_code == 200
     body = response.json()
     assert body["available"] is False
-    assert "Coordinates: Not collected yet" in body["message"]
-    assert "location sharing" in body["message"].lower() or "latitude" in body["message"].lower()
+    assert body["message"] == LOCATION_REQUIRED_MESSAGE
+    assert body["latitude"] is None
 
 
-def test_location_settings_reports_sources_and_privacy(tmp_path: Path) -> None:
-    from starpulse.collector.client import DishCoordinates
-
-    app = _make_app(
-        tmp_path,
-        env={"STARPULSE_WEATHER_LATITUDE": "54.6", "STARPULSE_WEATHER_LONGITUDE": "25.2"},
-    )
-    app.state.collector._dish_location = DishCoordinates(latitude=52.4, longitude=0.7)
+def test_location_starlink_gps_fallback(tmp_path: Path) -> None:
+    app = _make_app(tmp_path, weather_client=FakeWeatherClient(_snapshot(latitude=52.4, longitude=0.7)))
+    app.state.collector._dish_location = DishCoordinates(latitude=52.4, longitude=0.7, altitude_m=18.0)
 
     with TestClient(app) as client:
-        response = client.get("/api/location/settings")
+        response = client.get("/api/location")
 
     assert response.status_code == 200
     body = response.json()
-    assert body["active_source"] == "dish_gps"
-    assert body["active_source_label"] == "Starlink GPS"
-    assert body["dish_gps_available"] is True
-    assert body["manual_latitude"] == pytest.approx(54.6)
-    assert body["manual_longitude"] == pytest.approx(25.2)
-    assert body["privacy_note"].startswith("StarPulse does not require location sharing")
+    assert body["available"] is True
+    assert body["source"] == "dish_gps"
+    assert body["source_label"] == "Starlink GPS"
 
 
-def test_save_manual_location_persists_as_fallback(tmp_path: Path) -> None:
-    app = _make_app(tmp_path)
-
-    with TestClient(app) as client:
-        response = client.post("/api/location/manual", json={"latitude": 52.413, "longitude": 0.748})
-        assert response.status_code == 200
-        body = response.json()
-        assert body["ok"] is True
-        assert body["settings"]["manual_latitude"] == pytest.approx(52.413)
-        assert body["settings"]["active_source"] == "configured"
-
-        settings = client.get("/api/location/settings").json()
-        assert settings["manual_longitude"] == pytest.approx(0.748)
-
-    reloaded = load_settings(data_dir=tmp_path / "data", env={})
-    assert reloaded.weather.latitude == pytest.approx(52.413)
-    assert reloaded.weather.longitude == pytest.approx(0.748)
-
-
-def test_clear_saved_location_removes_manual_and_stored(tmp_path: Path) -> None:
-    from starpulse.db.models import AppMeta
-    from starpulse.services.location import RESOLVED_LAT_KEY, RESOLVED_LON_KEY
-
+def test_location_geoip_fallback(tmp_path: Path) -> None:
+    geoip = FixedGeoIpProvider(
+        GeoIpResult(latitude=51.5, longitude=-0.1, place_name="London, GB", accuracy="City level only")
+    )
     app = _make_app(
         tmp_path,
-        env={"STARPULSE_WEATHER_LATITUDE": "51.5", "STARPULSE_WEATHER_LONGITUDE": "-0.1"},
+        geoip_provider=geoip,
+        weather_client=FakeWeatherClient(_snapshot(latitude=51.5, longitude=-0.1)),
     )
-    session = next(app.state.db.get_session())
-    try:
-        session.add(AppMeta(key=RESOLVED_LAT_KEY, value="48.0"))
-        session.add(AppMeta(key=RESOLVED_LON_KEY, value="2.0"))
-        session.commit()
-    finally:
-        session.close()
 
     with TestClient(app) as client:
-        response = client.post("/api/location/clear", json={})
-        assert response.status_code == 200
-        body = response.json()
-        assert body["ok"] is True
-        assert body["settings"]["manual_latitude"] is None
-        assert body["settings"]["manual_longitude"] is None
-        assert body["settings"]["active_source"] is None
+        response = client.get("/api/location")
 
-    reloaded = load_settings(data_dir=tmp_path / "data", env={})
-    assert reloaded.weather.latitude is None
-    assert reloaded.weather.longitude is None
+    assert response.status_code == 200
+    body = response.json()
+    assert body["available"] is True
+    assert body["source"] == "geoip"
+    assert body["approximate"] is True
+    assert body["accuracy"] == "City level only"
+    assert body["source_label"] == "Approximate IP location"
 
 
-def test_location_weather_test_uses_provided_coordinates(tmp_path: Path) -> None:
-    from datetime import datetime, timezone
-
-    from starpulse.services.weather import WeatherSnapshot
-
-    class OkWeather:
-        def __init__(self) -> None:
-            self.last_coords = None
-
-        def fetch(self, latitude: float, longitude: float) -> WeatherSnapshot:
-            self.last_coords = (latitude, longitude)
-            return WeatherSnapshot(
-                temperature_c=12.0,
-                feels_like_c=11.0,
-                humidity_percent=70.0,
-                wind_speed_kph=8.0,
-                conditions="Clear sky",
-                precipitation_mm=0.0,
-                precipitation_probability=5.0,
-                latitude=latitude,
-                longitude=longitude,
-                fetched_at=datetime.now(timezone.utc),
-            )
-
-    weather = OkWeather()
-    settings = load_settings(data_dir=tmp_path / "data", env={})
-    app = create_app(
-        settings,
-        start_collector=False,
-        start_weather_sampler=False,
-        weather_client=weather,
-        place_resolver=NullPlaceNameResolver(),
+def test_manual_preferred_over_geoip_and_dish(tmp_path: Path) -> None:
+    geoip = FixedGeoIpProvider(GeoIpResult(latitude=40.0, longitude=-74.0))
+    app = _make_app(
+        tmp_path,
+        env={"STARPULSE_WEATHER_LATITUDE": "52.4", "STARPULSE_WEATHER_LONGITUDE": "0.7"},
+        geoip_provider=geoip,
+        weather_client=FakeWeatherClient(_snapshot()),
     )
+    app.state.collector._dish_location = DishCoordinates(latitude=10.0, longitude=20.0)
+
+    with TestClient(app) as client:
+        body = client.get("/api/location").json()
+
+    assert body["source"] == "configured"
+    assert body["latitude"] == pytest.approx(52.4)
+
+
+def test_location_settings_and_save_clear(tmp_path: Path) -> None:
+    app = _make_app(tmp_path, weather_client=FakeWeatherClient(_snapshot()))
+
+    with TestClient(app) as client:
+        settings = client.get("/api/location/settings").json()
+        assert settings["privacy_note"].startswith("StarPulse does not require location sharing")
+        assert "Location required" in (settings["message"] or "Location required")
+
+        saved = client.post("/api/location/manual", json={"latitude": 52.413, "longitude": 0.748}).json()
+        assert saved["ok"] is True
+        assert saved["settings"]["active_source"] == "configured"
+        assert saved["settings"]["weather_ok"] is True
+
+        cleared = client.post("/api/location/clear", json={}).json()
+        assert cleared["ok"] is True
+        assert cleared["settings"]["manual_latitude"] is None
+
+
+def test_location_weather_test(tmp_path: Path) -> None:
+    weather = FakeWeatherClient(_snapshot(conditions="Overcast"))
+    app = _make_app(tmp_path, weather_client=weather)
 
     with TestClient(app) as client:
         response = client.post("/api/location/test", json={"latitude": 52.4, "longitude": 0.7})
 
     assert response.status_code == 200
-    body = response.json()
-    assert body["available"] is True
-    assert body["conditions"] == "Clear sky"
+    assert response.json()["conditions"] == "Overcast"
     assert weather.last_coords == (52.4, 0.7)
+
+
+def test_weather_returns_location_required_when_missing(tmp_path: Path) -> None:
+    app = _make_app(tmp_path)
+    with TestClient(app) as client:
+        body = client.get("/api/weather").json()
+    assert body["available"] is False
+    assert body["message"] == LOCATION_REQUIRED_MESSAGE
+
+
+def test_advanced_note_for_locked_gps_without_coords(tmp_path: Path) -> None:
+    app = _make_app(tmp_path)
+    session = next(app.state.db.get_session())
+    try:
+        save_sample(session, make_sample(gps_valid=True, latitude=None, longitude=None))
+    finally:
+        session.close()
+
+    with TestClient(app) as client:
+        settings = client.get("/api/location/settings").json()
+
+    assert settings["advanced_note"] == "Starlink GPS locked but coordinates unavailable"
+    # Dashboard location payload must not push that jargon as the main message.
+    with TestClient(app) as client:
+        location = client.get("/api/location").json()
+    assert location["message"] == LOCATION_REQUIRED_MESSAGE

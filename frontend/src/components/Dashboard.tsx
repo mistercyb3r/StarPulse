@@ -108,8 +108,8 @@ export function Dashboard({ onOpenWeatherImpact, onOpenLocationSettings }: Dashb
       <PerformanceStats performance={performance} period={performancePeriod} onPeriodChange={setPerformancePeriod} />
 
       <section className="dashboard__info-grid">
-        <LocationCard location={location} />
-        <WeatherCard weather={weather} />
+        <LocationCard location={location} onSetupLocation={onOpenLocationSettings} />
+        <WeatherCard weather={weather} onSetupLocation={onOpenLocationSettings} />
         <SignalConditionsCard impact={weatherImpact} />
         <PowerCard current={status} stats={performance} periodLabel={periodLabel} />
         <LatencyStatsCard current={status} stats={performance} periodLabel={periodLabel} />

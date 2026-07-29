@@ -1,62 +1,57 @@
 import type { LocationResponse } from "../api/types";
-import { InfoCard } from "./InfoCard";
+import { ChartCard } from "./charts/ChartCard";
+import "./LocationCard.css";
 
 interface LocationCardProps {
   location: LocationResponse | null;
+  onSetupLocation?: () => void;
 }
 
-function formatCoordinate(value: number | null | undefined, digits: number = 4): string {
-  if (value === null || value === undefined) return "—";
-  return `${value.toFixed(digits)}°`;
+function formatSource(location: LocationResponse): string {
+  if (location.source === "configured") return "Manual configuration";
+  if (location.source === "geoip") return "Approximate IP location";
+  if (location.source === "dish_gps") return "Starlink GPS";
+  if (location.source === "stored") return "Last known";
+  return location.source_label ?? "Unknown";
 }
 
-function gpsStatusLabel(location: LocationResponse): string {
-  if (location.gps_enabled === false) return "Disabled";
-  if (location.gps_valid === true) return "Locked";
-  if (location.gps_valid === false) return "Searching";
-  return "Unknown";
-}
-
-export function LocationCard({ location }: LocationCardProps) {
+export function LocationCard({ location, onSetupLocation }: LocationCardProps) {
   if (location === null) {
-    return <InfoCard title="📍 Location" rows={[]} unavailableMessage="Loading location…" />;
+    return (
+      <ChartCard title="📍 Location">
+        <p className="location-card__muted">Loading location…</p>
+      </ChartCard>
+    );
   }
 
   if (!location.available || !location.coordinates_collected) {
-    const rows = [
-      { label: "GPS", value: gpsStatusLabel(location) },
-      { label: "Coordinates", value: "Not collected yet" },
-    ];
-    if (location.gps_valid === true) {
-      rows.push({
-        label: "Fallback",
-        value: "Enable dish location sharing, or set lat/lon in setup",
-      });
-    }
-    return <InfoCard title="📍 Location" rows={rows} />;
+    return (
+      <ChartCard title="📍 Location">
+        <p className="location-card__place">Not configured</p>
+        {onSetupLocation && (
+          <button type="button" className="location-card__setup" onClick={onSetupLocation}>
+            Setup
+          </button>
+        )}
+      </ChartCard>
+    );
   }
 
   const place =
     location.place_name
-    ?? `${formatCoordinate(location.latitude)} ${formatCoordinate(location.longitude)}`;
-
-  const rows = [
-    { label: "Place", value: place },
-    { label: "Source", value: location.source_label ?? location.source ?? "—" },
-  ];
-  if (location.altitude_m != null) {
-    rows.push({ label: "Altitude", value: `${Math.round(location.altitude_m)} m` });
-  }
+    ?? `${location.latitude?.toFixed(4)}, ${location.longitude?.toFixed(4)}`;
 
   return (
-    <InfoCard
-      title="📍 Location"
-      subtitle={
-        location.place_name
-          ? `Source: ${location.source_label ?? location.source ?? "—"}`
-          : undefined
-      }
-      rows={rows}
-    />
+    <ChartCard title="📍 Location" subtitle={`Source: ${formatSource(location)}`}>
+      <p className="location-card__place">{place}</p>
+      {location.approximate && location.accuracy && (
+        <p className="location-card__muted">Accuracy: {location.accuracy}</p>
+      )}
+      {onSetupLocation && (
+        <button type="button" className="location-card__setup location-card__setup--subtle" onClick={onSetupLocation}>
+          Change
+        </button>
+      )}
+    </ChartCard>
   );
 }

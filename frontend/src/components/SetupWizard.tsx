@@ -1,5 +1,10 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ApiValidationError, getSetupStatus, submitSetup } from "../api/client";
+import {
+  detectBrowserLocation,
+  GeolocationDeniedError,
+  GeolocationUnavailableError,
+} from "../utils/geolocation";
 import "./SetupWizard.css";
 
 interface SetupWizardProps {
@@ -28,6 +33,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [restartNotice, setRestartNotice] = useState<string | null>(null);
+  const [detectHint, setDetectHint] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,6 +59,28 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
       cancelled = true;
     };
   }, []);
+
+  async function handleDetectLocation() {
+    setError(null);
+    setDetectHint(null);
+    try {
+      const coords = await detectBrowserLocation();
+      setForm((current) => ({
+        ...current,
+        weather_latitude: String(Math.round(coords.latitude * 10_000) / 10_000),
+        weather_longitude: String(Math.round(coords.longitude * 10_000) / 10_000),
+      }));
+      setDetectHint("Location detected from this device. Save and continue to keep it.");
+    } catch (err) {
+      if (err instanceof GeolocationDeniedError) {
+        setDetectHint("Permission denied — enter latitude and longitude manually if you want weather.");
+      } else if (err instanceof GeolocationUnavailableError) {
+        setDetectHint("Could not detect location — enter coordinates manually if you want weather.");
+      } else {
+        setDetectHint("Could not detect location — enter coordinates manually if you want weather.");
+      }
+    }
+  }
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -165,7 +193,7 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               step="0.0001"
               value={form.weather_latitude}
               onChange={(event) => setForm((current) => ({ ...current, weather_latitude: event.target.value }))}
-              placeholder="Leave blank to use dish GPS"
+              placeholder="Recommended for reliable weather"
               disabled={fieldsDisabled}
             />
           </label>
@@ -179,15 +207,24 @@ export function SetupWizard({ onComplete }: SetupWizardProps) {
               step="0.0001"
               value={form.weather_longitude}
               onChange={(event) => setForm((current) => ({ ...current, weather_longitude: event.target.value }))}
-              placeholder="Leave blank to use dish GPS"
+              placeholder="Recommended for reliable weather"
               disabled={fieldsDisabled}
             />
             <span className="setup-wizard__hint">
-              Fallback when the dish does not share GPS coordinates (GPS lock alone is not enough).
-              Enable location sharing on the dish for automatic weather location, or enter both
-              latitude and longitude here.
+              Manual coordinates are preferred for weather. You can detect from this device, or leave
+              blank to try approximate IP location later.
             </span>
           </label>
+
+          <button
+            type="button"
+            className="setup-wizard__secondary"
+            onClick={() => void handleDetectLocation()}
+            disabled={fieldsDisabled}
+          >
+            Detect my location
+          </button>
+          {detectHint && <p className="setup-wizard__hint">{detectHint}</p>}
 
           {error && <p className="setup-wizard__error">{error}</p>}
 

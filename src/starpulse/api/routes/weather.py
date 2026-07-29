@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy.orm import Session
 
 from starpulse.api.deps import get_collector, get_db, get_settings, get_weather_provider
@@ -25,12 +25,17 @@ from starpulse.api.schemas import (
 from starpulse.collector import repository as telemetry_repository
 from starpulse.collector.poller import StarlinkPoller
 from starpulse.config.settings import Settings
+from starpulse.services.geoip import GeoIpProvider, NullGeoIpProvider
 from starpulse.services.location import location_unavailable_message, resolve_weather_location
 from starpulse.services.weather import CachedWeatherProvider, WeatherUnavailableError
 from starpulse.services.weather_impact import compute_weather_impact
 from starpulse.services.weather_repository import get_weather_history
 
 router = APIRouter(prefix="/weather", tags=["weather"])
+
+
+def _get_geoip_provider(request: Request) -> GeoIpProvider:
+    return getattr(request.app.state, "geoip_provider", None) or NullGeoIpProvider()
 
 
 class WeatherHistoryPeriod(str, Enum):
@@ -58,11 +63,14 @@ def get_weather(
     collector: StarlinkPoller = Depends(get_collector),
     provider: CachedWeatherProvider = Depends(get_weather_provider),
     db: Session = Depends(get_db),
+    geoip_provider: GeoIpProvider = Depends(_get_geoip_provider),
 ) -> WeatherResponse:
     if not settings.weather.enabled:
         return WeatherResponse(available=False, message="Weather integration is disabled in config.toml")
 
-    resolved = resolve_weather_location(settings, collector, db, persist=True)
+    resolved = resolve_weather_location(
+        settings, collector, db, persist=True, geoip_provider=geoip_provider
+    )
     if resolved is None:
         return WeatherResponse(
             available=False,
@@ -96,6 +104,7 @@ def get_weather_impact(
     collector: StarlinkPoller = Depends(get_collector),
     provider: CachedWeatherProvider = Depends(get_weather_provider),
     db: Session = Depends(get_db),
+    geoip_provider: GeoIpProvider = Depends(_get_geoip_provider),
 ) -> WeatherImpactResponse:
     if not settings.weather.enabled:
         return WeatherImpactResponse(
@@ -105,7 +114,9 @@ def get_weather_impact(
         )
 
     snapshot = None
-    resolved = resolve_weather_location(settings, collector, db, persist=True)
+    resolved = resolve_weather_location(
+        settings, collector, db, persist=True, geoip_provider=geoip_provider
+    )
     if resolved is not None:
         try:
             snapshot = provider.get_weather(resolved.latitude, resolved.longitude)

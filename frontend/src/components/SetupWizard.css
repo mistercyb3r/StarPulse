@@ -106,6 +106,22 @@
   cursor: pointer;
 }
 
+.setup-wizard__secondary {
+  font: inherit;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: 0.6rem;
+  padding: 0.65rem 1rem;
+  cursor: pointer;
+}
+
+.setup-wizard__secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .setup-wizard__submit:disabled {
   opacity: 0.6;
   cursor: not-allowed;

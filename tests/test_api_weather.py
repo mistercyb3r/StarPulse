@@ -10,6 +10,8 @@ from fastapi.testclient import TestClient
 from starpulse.app import create_app
 from starpulse.collector.repository import save_sample
 from starpulse.config.settings import load_settings
+from starpulse.services.geoip import NullGeoIpProvider
+from starpulse.services.location import LOCATION_REQUIRED_MESSAGE
 from starpulse.services.weather import WeatherSnapshot, WeatherUnavailableError
 
 from tests.collector.factories import make_sample
@@ -47,11 +49,17 @@ def _snapshot(**overrides) -> WeatherSnapshot:
 
 def _make_app(tmp_path: Path, weather_client, env: dict[str, str] | None = None) -> FastAPI:
     settings = load_settings(data_dir=tmp_path / "data", env=env or {})
-    return create_app(settings, start_collector=False, start_weather_sampler=False, weather_client=weather_client)
+    return create_app(
+        settings,
+        start_collector=False,
+        start_weather_sampler=False,
+        weather_client=weather_client,
+        geoip_provider=NullGeoIpProvider(),
+    )
 
 
 def test_weather_unavailable_when_no_location(tmp_path: Path) -> None:
-    """No configured coords and no dish GPS → location unavailable."""
+    """No manual coords, geoip, or dish GPS → Location required."""
     app = _make_app(tmp_path, FakeWeatherClient(Exception("should not be called")))
     with TestClient(app) as client:
         response = client.get("/api/weather")
@@ -60,8 +68,7 @@ def test_weather_unavailable_when_no_location(tmp_path: Path) -> None:
     body = response.json()
     assert body["available"] is False
     assert body["temperature_c"] is None
-    assert body["message"] is not None
-    assert "unavailable" in body["message"].lower() or "latitude" in body["message"].lower()
+    assert body["message"] == LOCATION_REQUIRED_MESSAGE
 
 
 def test_weather_unavailable_when_disabled(tmp_path: Path) -> None:
@@ -103,7 +110,7 @@ def test_weather_uses_configured_location(tmp_path: Path) -> None:
 
 
 def test_weather_uses_dish_gps_when_no_config(tmp_path: Path) -> None:
-    """Dish GPS is the primary location source."""
+    """Dish GPS is an advanced fallback when manual/geoip are unavailable."""
     from starpulse.collector.client import DishCoordinates
 
     weather = FakeWeatherClient(_snapshot(latitude=40.0, longitude=10.0))
@@ -121,11 +128,11 @@ def test_weather_uses_dish_gps_when_no_config(tmp_path: Path) -> None:
     assert weather.last_coords == (40.0, 10.0)
 
 
-def test_weather_dish_gps_preferred_over_configured(tmp_path: Path) -> None:
-    """Dish GPS wins over configured weather.latitude/longitude."""
+def test_weather_manual_preferred_over_dish_gps(tmp_path: Path) -> None:
+    """Manual configuration wins over dish GPS."""
     from starpulse.collector.client import DishCoordinates
 
-    weather = FakeWeatherClient(_snapshot(latitude=40.0, longitude=10.0))
+    weather = FakeWeatherClient(_snapshot(latitude=51.5, longitude=-0.1))
     app = _make_app(
         tmp_path,
         weather,
@@ -138,8 +145,8 @@ def test_weather_dish_gps_preferred_over_configured(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert body["location_source"] == "dish_gps"
-    assert weather.last_coords == (40.0, 10.0)
+    assert body["location_source"] == "configured"
+    assert weather.last_coords == (51.5, -0.1)
 
 
 def test_weather_falls_back_to_stored_telemetry_gps(tmp_path: Path) -> None:

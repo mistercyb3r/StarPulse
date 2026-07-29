@@ -77,12 +77,10 @@ poll_interval_seconds = 5.0
 # Shows current weather on the dashboard (via the free Open-Meteo API,
 # no API key required).
 enabled = true
-# Leave blank to use the dish's own GPS coordinates automatically when
-# location sharing is enabled on the dish (GPS lock alone is not enough —
-# status_data reports lock, but lat/lon only come from the location RPC).
-# If the dish does not share coordinates, set a manual fallback here, e.g.
-# latitude = "51.5074", longitude = "-0.1278" for London. Dish GPS is
-# preferred when both are available.
+# Manual coordinates are preferred for weather. Leave blank to fall back to
+# approximate IP location, then Starlink dish GPS when location sharing
+# returns real coordinates. Example:
+# latitude = "51.5074", longitude = "-0.1278" for London.
 latitude = ""
 longitude = ""
 # How long (in seconds) to cache weather API responses before refreshing.

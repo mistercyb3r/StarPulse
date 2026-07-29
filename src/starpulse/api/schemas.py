@@ -148,10 +148,12 @@ class LocationResponse(BaseModel):
     latitude: float | None = None
     longitude: float | None = None
     altitude_m: float | None = None
-    # One of: "dish_gps", "configured", "stored", or None when unavailable.
+    # One of: "configured", "geoip", "dish_gps", "stored", or None.
     source: str | None = None
     source_label: str | None = None
     place_name: str | None = None
+    accuracy: str | None = None
+    approximate: bool = False
     gps_valid: bool | None = None
     gps_enabled: bool | None = None
     gps_satellites: int | None = None
@@ -167,6 +169,10 @@ class LocationSettingsResponse(BaseModel):
     active_latitude: float | None = None
     active_longitude: float | None = None
     place_name: str | None = None
+    accuracy: str | None = None
+    approximate: bool = False
+    weather_ok: bool = False
+    weather_summary: str | None = None
     dish_gps_available: bool = False
     dish_latitude: float | None = None
     dish_longitude: float | None = None
@@ -174,6 +180,8 @@ class LocationSettingsResponse(BaseModel):
     manual_longitude: float | None = None
     gps_valid: bool | None = None
     gps_enabled: bool | None = None
+    gps_satellites: int | None = None
+    advanced_note: str | None = None
     message: str | None = None
     privacy_note: str
 

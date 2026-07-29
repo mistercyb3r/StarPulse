@@ -88,34 +88,44 @@ def _ico_from_png(png_bytes: bytes) -> bytes:
 
 
 def make_logo_png(path: Path) -> None:
-    """Horizontal logo: icon + StarPulse wordmark on a dark plate (README-safe)."""
-    w, h = 1280, 320
+    """Horizontal logo: icon + StarPulse wordmark on a dark plate (README-safe).
+
+    Renders the lockup, then sizes the plate to the visible ink with equal
+    padding so the wordmark reads centered (a fixed wide canvas looks left-heavy).
+    """
+    mark_scale = 2.5
+    gap = 56
+    font = _font(128, bold=True)
+    text = "StarPulse"
+    pad_x, pad_y = 72, 56
+
+    # Draw lockup on a generous transparent canvas
+    canvas = 1600
+    layer = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
+    ld = ImageDraw.Draw(layer)
+    tb = ld.textbbox((0, 0), text, font=font)
+
+    mark_cx = 280.0
+    mark_cy = canvas / 2
+    _draw_mark(ld, mark_cx, mark_cy, mark_scale)
+
+    text_x = mark_cx + 46 * mark_scale + gap
+    text_y = mark_cy - (tb[1] + tb[3]) / 2
+    ld.text((text_x, text_y), text, font=font, fill=TEXT)
+
+    ink = layer.getbbox()
+    if ink is None:
+        raise RuntimeError("logo lockup produced no visible pixels")
+    lockup = layer.crop(ink)
+    lw, lh = lockup.size
+
+    w = lw + 2 * pad_x
+    h = lh + 2 * pad_y
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-
-    # Dark plate so white wordmark stays readable on GitHub light theme
-    _fill_rounded_rect(draw, (0, 0, w - 1, h - 1), 48, BG)
-
-    icon_size = 220
-    gap = 56
-    font = _font(120, bold=True)
-    text = "StarPulse"
-    # Ink bbox (not em-box): FreeType "middle" anchors sit a few px low for this face
-    tb = draw.textbbox((0, 0), text, font=font)
-    text_w = tb[2] - tb[0]
-    lockup_w = icon_size + gap + text_w
-    icon_x = max(40, (w - lockup_w) // 2)
-    icon_y = (h - icon_size) // 2
-    icon_cy = icon_y + icon_size / 2
-
-    icon = _draw_icon_tile(icon_size)
-    img.alpha_composite(icon, (icon_x, icon_y))
-
-    # Place so the wordmark ink is optically centered on the icon mid-line
-    tx = icon_x + icon_size + gap
-    ty = icon_cy - (tb[1] + tb[3]) / 2
-    draw.text((tx, ty), text, font=font, fill=TEXT)
-
+    radius = max(24, min(w, h) // 6)
+    _fill_rounded_rect(draw, (0, 0, w - 1, h - 1), radius, BG)
+    img.alpha_composite(lockup, (pad_x, pad_y))
     img.save(path, "PNG")
 
 

@@ -13,13 +13,15 @@
       <stop offset="100%" stop-color="#3b9dff"/>
     </linearGradient>
   </defs>
-  <!-- Icon mark -->
-  <rect x="8" y="16" width="128" height="128" rx="28" fill="url(#sp-bg)"/>
-  <circle cx="72" cy="80" r="42" fill="none" stroke="url(#sp-ring)" stroke-width="6"/>
-  <circle cx="72" cy="80" r="28" fill="none" stroke="#3b9dff" stroke-width="3" opacity="0.35"/>
-  <path d="M72 44 L78 70 L104 80 L78 90 L72 116 L66 90 L40 80 L66 70 Z" fill="#e7edf3"/>
-  <circle cx="72" cy="80" r="8" fill="url(#sp-pulse)"/>
-  <path d="M26 80 H42 M102 80 H118" stroke="url(#sp-pulse)" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
-  <!-- Wordmark: dominant-baseline middle aligns with icon center (cy=80) -->
-  <text x="168" y="80" dominant-baseline="middle" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="64" font-weight="700" letter-spacing="-1.5" fill="#e7edf3">StarPulse</text>
+  <!-- Plate -->
+  <rect width="640" height="160" rx="28" fill="url(#sp-bg)"/>
+  <!-- Lockup centered in 640×160 (mark + gap + wordmark ≈ 500px) -->
+  <g transform="translate(70 0)">
+    <circle cx="64" cy="80" r="42" fill="none" stroke="url(#sp-ring)" stroke-width="6"/>
+    <circle cx="64" cy="80" r="28" fill="none" stroke="#3b9dff" stroke-width="3" opacity="0.35"/>
+    <path d="M64 44 L70 70 L96 80 L70 90 L64 116 L58 90 L32 80 L58 70 Z" fill="#e7edf3"/>
+    <circle cx="64" cy="80" r="8" fill="url(#sp-pulse)"/>
+    <path d="M18 80 H34 M94 80 H110" stroke="url(#sp-pulse)" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
+    <text x="140" y="80" dominant-baseline="central" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="64" font-weight="700" letter-spacing="-1.5" fill="#e7edf3">StarPulse</text>
+  </g>
 </svg>

@@ -90,16 +90,17 @@ def _ico_from_png(png_bytes: bytes) -> bytes:
 def make_logo_png(path: Path) -> None:
     """Horizontal logo: icon + StarPulse wordmark on a dark plate (README-safe).
 
-    Renders the lockup, then sizes the plate to the visible ink with equal
-    padding so the wordmark reads centered (a fixed wide canvas looks left-heavy).
+    The dark plate sits on a transparent canvas with equal outer margin so GitHub
+    dark-mode viewers don't blend the plate into the page and make the lockup
+    look left-aligned.
     """
     mark_scale = 2.5
     gap = 56
     font = _font(128, bold=True)
     text = "StarPulse"
-    pad_x, pad_y = 72, 56
+    pad_x, pad_y = 64, 48
+    outer = 24  # transparent margin around the plate
 
-    # Draw lockup on a generous transparent canvas
     canvas = 1600
     layer = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
     ld = ImageDraw.Draw(layer)
@@ -119,13 +120,28 @@ def make_logo_png(path: Path) -> None:
     lockup = layer.crop(ink)
     lw, lh = lockup.size
 
-    w = lw + 2 * pad_x
-    h = lh + 2 * pad_y
+    plate_w = lw + 2 * pad_x
+    plate_h = lh + 2 * pad_y
+    w = plate_w + 2 * outer
+    h = plate_h + 2 * outer
+
     img = Image.new("RGBA", (w, h), (0, 0, 0, 0))
     draw = ImageDraw.Draw(img)
-    radius = max(24, min(w, h) // 6)
-    _fill_rounded_rect(draw, (0, 0, w - 1, h - 1), radius, BG)
-    img.alpha_composite(lockup, (pad_x, pad_y))
+    radius = max(24, min(plate_w, plate_h) // 6)
+    _fill_rounded_rect(
+        draw,
+        (outer, outer, outer + plate_w - 1, outer + plate_h - 1),
+        radius,
+        BG,
+    )
+    # Subtle rim so the plate edge stays visible on near-black backgrounds
+    draw.rounded_rectangle(
+        (outer, outer, outer + plate_w - 1, outer + plate_h - 1),
+        radius=radius,
+        outline=(42, 52, 66, 255),
+        width=2,
+    )
+    img.alpha_composite(lockup, (outer + pad_x, outer + pad_y))
     img.save(path, "PNG")
 
 

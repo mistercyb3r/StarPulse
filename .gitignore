@@ -22,8 +22,21 @@ htmlcov/
 # Local dev tooling (e.g. portable Node.js, not part of the project)
 /.tools/
 
+# Frontend build artifacts
+frontend/dist/
+frontend/node_modules/
+frontend/**/*.tsbuildinfo
+*.tsbuildinfo
+
 # Editors / OS
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+desktop.ini
+
+# Env files with secrets (keep .env.example)
+.env
+.env.local
+frontend/.env
+frontend/.env.local

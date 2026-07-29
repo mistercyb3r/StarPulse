@@ -5,11 +5,11 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "starpulse"
 version = "1.0.0"
-description = "Self-hosted local dashboard for Starlink telemetry"
+description = "Self-hosted Starlink monitoring dashboard with telemetry, weather, outage tracking and email alerts."
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "Aurimas" }]
+authors = [{ name = "mistercyber" }]
 dependencies = [
     "fastapi>=0.110",
     "uvicorn[standard]>=0.29",

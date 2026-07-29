@@ -98,7 +98,10 @@ def make_logo_png(path: Path) -> None:
     gap = 56
     font = _font(128, bold=True)
     text = "StarPulse"
-    pad_x, pad_y = 64, 48
+    pad_y = 48
+    # Optical horizontal balance: circular mark reads lighter than the wordmark,
+    # so equal padding still looks left-heavy — bias padding to the left.
+    pad_left, pad_right = 96, 48
     outer = 24  # transparent margin around the plate
 
     canvas = 1600
@@ -111,7 +114,8 @@ def make_logo_png(path: Path) -> None:
     _draw_mark(ld, mark_cx, mark_cy, mark_scale)
 
     text_x = mark_cx + 46 * mark_scale + gap
-    text_y = mark_cy - (tb[1] + tb[3]) / 2
+    # Slight upward nudge so mixed-case ink sits on the mark mid-line optically
+    text_y = mark_cy - (tb[1] + tb[3]) / 2 - 4
     ld.text((text_x, text_y), text, font=font, fill=TEXT)
 
     ink = layer.getbbox()
@@ -120,7 +124,7 @@ def make_logo_png(path: Path) -> None:
     lockup = layer.crop(ink)
     lw, lh = lockup.size
 
-    plate_w = lw + 2 * pad_x
+    plate_w = lw + pad_left + pad_right
     plate_h = lh + 2 * pad_y
     w = plate_w + 2 * outer
     h = plate_h + 2 * outer
@@ -141,7 +145,7 @@ def make_logo_png(path: Path) -> None:
         outline=(42, 52, 66, 255),
         width=2,
     )
-    img.alpha_composite(lockup, (outer + pad_x, outer + pad_y))
+    img.alpha_composite(lockup, (outer + pad_left, outer + pad_y))
     img.save(path, "PNG")
 
 

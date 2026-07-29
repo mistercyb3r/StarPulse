@@ -13,15 +13,14 @@
       <stop offset="100%" stop-color="#3b9dff"/>
     </linearGradient>
   </defs>
-  <!-- Plate -->
-  <rect width="640" height="160" rx="28" fill="url(#sp-bg)"/>
-  <!-- Lockup centered in 640×160 (mark + gap + wordmark ≈ 500px) -->
-  <g transform="translate(70 0)">
+  <!-- Plate with optical left bias so icon+wordmark reads centered -->
+  <rect x="8" y="8" width="624" height="144" rx="24" fill="url(#sp-bg)" stroke="#2a3442" stroke-width="2"/>
+  <g transform="translate(88 0)">
     <circle cx="64" cy="80" r="42" fill="none" stroke="url(#sp-ring)" stroke-width="6"/>
     <circle cx="64" cy="80" r="28" fill="none" stroke="#3b9dff" stroke-width="3" opacity="0.35"/>
     <path d="M64 44 L70 70 L96 80 L70 90 L64 116 L58 90 L32 80 L58 70 Z" fill="#e7edf3"/>
     <circle cx="64" cy="80" r="8" fill="url(#sp-pulse)"/>
     <path d="M18 80 H34 M94 80 H110" stroke="url(#sp-pulse)" stroke-width="4" stroke-linecap="round" opacity="0.85"/>
-    <text x="140" y="80" dominant-baseline="central" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="64" font-weight="700" letter-spacing="-1.5" fill="#e7edf3">StarPulse</text>
+    <text x="140" y="78" dominant-baseline="central" font-family="Segoe UI, Helvetica Neue, Arial, sans-serif" font-size="64" font-weight="700" letter-spacing="-1.5" fill="#e7edf3">StarPulse</text>
   </g>
 </svg>

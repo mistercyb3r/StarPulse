@@ -19,12 +19,7 @@ plugins/modules over time.
 
 ## Screenshots
 
-> Add real captures under `docs/screenshots/` when you have a dish online.
-> Placeholder notes live in [`docs/screenshots/README.md`](docs/screenshots/README.md).
-
-| Setup wizard | Dashboard |
-| --- | --- |
-| ![StarPulse first-run setup screen](docs/screenshots/setup.png) | ![StarPulse dashboard](docs/screenshots/dashboard.png) |
+![StarPulse dashboard](docs/screenshots/dashboard.png)
 
 ## Design principles
 
